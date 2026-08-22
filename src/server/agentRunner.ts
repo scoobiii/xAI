@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import os from "os";
 import { getGeminiAI } from "./gemini";
 import { AgentSandbox, SandboxToolResult } from "./sandbox";
 import { buildAgentSystemPrompt, buildThreadContextPrompt, SANDBOX_TOOL_DECLARATIONS } from "./promptEngine";
@@ -13,6 +14,25 @@ export interface AgentExecutionResult {
   chartData?: InteractiveChartData;
   codeArtifact?: CodeExecutionArtifact;
   externalSideEffect?: ExternalSideEffectReceipt;
+  contract_version?: "0.1";
+  invocation_id?: string;
+  agent?: string;
+  status?: "success" | "error" | "partial" | "timeout";
+  executed?: boolean;
+  output?: { stdout: string; stderr: string; exit_code: number | null };
+  duration_ms?: number;
+  evidence_hash?: string;
+  timestamp?: string;
+  runtime_id?: string;
+  truncated?: boolean;
+}
+
+
+function getRuntimeId(): string {
+  const hostname = os.hostname();
+  const pid = process.pid;
+  const bootMs = Date.now() - process.uptime() * 1000;
+  return crypto.createHash("sha256").update(String(hostname) + ":" + String(pid) + ":" + String(bootMs)).digest("hex");
 }
 
 export class AgentRunner {
@@ -512,12 +532,37 @@ export class AgentRunner {
       recalledMemories: memoryLogRecalled,
     };
 
+    const stdout =
+      (finalCodeArtifact && finalCodeArtifact.stdout) || finalContent || "";
+    const stderr = "";
+    const exit_code = finalCodeArtifact || finalContent ? 0 : null;
+    const executed = exit_code !== null;
+    const status = executed ? "success" : "error";
+    const duration_ms = totalDuration;
+    const evidence_hash = executed
+      ? crypto
+          .createHash("sha256")
+          .update(String(stdout) + String(stderr) + String(exit_code ?? "") + String(duration_ms), "utf8")
+          .digest("hex")
+      : undefined;
+
     return {
       content: finalContent,
       thoughtLog,
       chartData: finalChart,
       codeArtifact: finalCodeArtifact,
       externalSideEffect: finalSideEffect,
+      contract_version: "0.1",
+      invocation_id: crypto.randomUUID(),
+      agent: agent.id || agent.handle || "unknown",
+      status,
+      executed,
+      output: { stdout, stderr, exit_code },
+      duration_ms,
+      evidence_hash,
+            runtime_id: getRuntimeId(),
+      truncated: false,
+      timestamp: new Date().toISOString(),
     };
   }
 }

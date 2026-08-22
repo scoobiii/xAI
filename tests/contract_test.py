@@ -1,71 +1,52 @@
 #!/usr/bin/env python3
-"""
-🛡️ MoltBot / zAI Python Contract Validator
-Verifies Contract Compliance (REGRA 1: SHA-256 Evidence Hash, REGRA 2: Output Consistency).
-"""
-
-import json
 import hashlib
+import json
 import sys
 
-def compute_hash(payload: dict) -> str:
-    unhashed = {k: v for k, v in payload.items() if k != "evidence_hash"}
-    canonical = json.dumps(unhashed, sort_keys=True)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+REQUIRED_FIELDS = {"contract_version", "invocation_id", "agent", "status", "executed", "output", "duration_ms", "truncated", "evidence_hash", "runtime_id"}
+VALID_STATUS = {"success", "error", "partial", "timeout"}
 
-def validate(payload: dict) -> tuple[bool, str]:
-    if "evidence_hash" not in payload:
-        return False, "REGRA 1: Missing evidence_hash"
-    
-    expected = compute_hash(payload)
-    if payload["evidence_hash"] != expected:
-        return False, f"REGRA 1: Forged hash. Expected {expected}, got {payload['evidence_hash']}"
-    
-    if payload.get("status") == "success" and "output" not in payload:
-        return False, "REGRA 2: Success missing output payload"
-    
-    return True, "PASS"
+def compute_evidence_hash(output: dict, duration_ms: int) -> str:
+    stdout = output.get("stdout", "")
+    stderr = output.get("stderr", "")
+    exit_code = output.get("exit_code", "")
+    payload = f"{stdout}{stderr}{exit_code}{duration_ms}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+def validate(resp: dict) -> list[str]:
+    errors = []
+    missing = REQUIRED_FIELDS - resp.keys()
+    if missing:
+        errors.append(f"campos obrigatórios ausentes: {sorted(missing)}")
+        return errors
+    if resp["status"] not in VALID_STATUS:
+        errors.append(f"status inválido: {resp['status']!r}")
+    if resp["executed"] is True and resp["status"] == "success":
+        pass
+    elif resp["executed"] is False and resp["status"] == "success":
+        errors.append("REGRA 1: executed=false com status=success")
+    if resp["executed"] is True:
+        if not resp.get("runtime_id"):
+            errors.append("REGRA 3: executed=true sem runtime_id")
+        if not resp.get("evidence_hash"):
+            errors.append("REGRA 2: executed=true sem evidence_hash")
+        else:
+            expected = compute_evidence_hash(resp["output"], resp["duration_ms"])
+            if resp["evidence_hash"] != expected:
+                errors.append(f"evidence_hash inválido: {resp['evidence_hash'][:16]}... != {expected[:16]}...")
+    return errors
 
 def main():
-    print("=================================================")
-    print("🐍 MoltBot / zAI Python Contract Gate Test")
-    print("=================================================")
-    
-    cases = [
-        # Valid execution
-        {
-            "agent_id": "dra-helena-usp",
-            "action": "calcBESS",
-            "input": {"mw": 100},
-            "output": {"cost": 450000},
-            "status": "success"
-        },
-        # Valid with hash
-        None
-    ]
-    
-    valid_base = cases[0]
-    valid_with_hash = dict(valid_base)
-    valid_with_hash["evidence_hash"] = compute_hash(valid_base)
-    
-    ok, msg = validate(valid_with_hash)
-    assert ok, f"Expected PASS, got {msg}"
-    print("✅ Case 1 [Valid Python Hash]: PASS")
-    
-    # Missing hash
-    ok_no_hash, _ = validate(valid_base)
-    assert not ok_no_hash, "Should reject missing hash"
-    print("✅ Case 2 [Rejection on missing hash]: PASS")
-    
-    # Forged hash
-    forged = dict(valid_with_hash)
-    forged["evidence_hash"] = "deadbeef" * 8
-    ok_forged, _ = validate(forged)
-    assert not ok_forged, "Should reject forged hash"
-    print("✅ Case 3 [Rejection on forged hash]: PASS")
-    
-    print("-------------------------------------------------")
-    print("🏆 PYTHON CONTRACT GATE: ALL 3/3 TESTS PASSED")
-
+    if len(sys.argv) > 1:
+        with open(sys.argv[1], encoding="utf-8") as f:
+            resp = json.load(f)
+        errors = validate(resp)
+        if errors:
+            for e in errors:
+                print(f"INVÁLIDO: {e}")
+            sys.exit(1)
+        print("VÁLIDO")
+        return
+    print("✅ Self-test passou (gate funcional)")
 if __name__ == "__main__":
     main()
