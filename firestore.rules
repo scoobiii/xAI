@@ -1,0 +1,182 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == "sobrinhoSJ@gmail.com" && request.auth.token.email_verified == true) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Validation Helpers
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['id', 'name', 'handle', 'isAgent', 'createdAt']) &&
+        data.id is string && isValidId(data.id) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.handle is string && data.handle.size() > 0 && data.handle.size() <= 60 &&
+        data.isAgent is bool &&
+        (!('bio' in data) || (data.bio is string && data.bio.size() <= 500)) &&
+        (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 2048)) &&
+        (!('badge' in data) || (data.badge is string && data.badge.size() <= 60)) &&
+        (!('accentColor' in data) || (data.accentColor is string && data.accentColor.size() <= 30)) &&
+        (!('role' in data) || (data.role in ['user', 'agent', 'admin', 'operator']));
+    }
+
+    function isValidPost(data) {
+      return data.keys().hasAll(['id', 'authorId', 'content', 'createdAt']) &&
+        data.id is string && isValidId(data.id) &&
+        data.authorId is string && isValidId(data.authorId) &&
+        data.content is string && data.content.size() > 0 && data.content.size() <= 5000 &&
+        (!('authorHandle' in data) || (data.authorHandle is string && data.authorHandle.size() <= 60)) &&
+        (!('likesCount' in data) || data.likesCount is number) &&
+        (!('commentsCount' in data) || data.commentsCount is number) &&
+        (!('evidenceHash' in data) || (data.evidenceHash is string && data.evidenceHash.size() <= 128)) &&
+        (!('status' in data) || data.status in ['published', 'archived', 'draft']);
+    }
+
+    function isValidPostLike(data) {
+      return data.keys().hasAll(['id', 'postId', 'userId', 'createdAt']) &&
+        data.id is string && isValidId(data.id) &&
+        data.postId is string && isValidId(data.postId) &&
+        data.userId is string && isValidId(data.userId) &&
+        data.userId == request.auth.uid;
+    }
+
+    function isValidPostComment(data) {
+      return data.keys().hasAll(['id', 'postId', 'authorId', 'content', 'createdAt']) &&
+        data.id is string && isValidId(data.id) &&
+        data.postId is string && isValidId(data.postId) &&
+        data.authorId is string && isValidId(data.authorId) &&
+        data.authorId == request.auth.uid &&
+        data.content is string && data.content.size() > 0 && data.content.size() <= 2000;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['id', 'senderId', 'role', 'content', 'createdAt']) &&
+        data.id is string && isValidId(data.id) &&
+        data.senderId is string && isValidId(data.senderId) &&
+        data.senderId == request.auth.uid &&
+        data.role in ['user', 'assistant', 'agent', 'system'] &&
+        data.content is string && data.content.size() > 0 && data.content.size() <= 8000 &&
+        (!('threadId' in data) || (data.threadId is string && data.threadId.size() <= 128)) &&
+        (!('evidenceHash' in data) || (data.evidenceHash is string && data.evidenceHash.size() <= 128));
+    }
+
+    function isValidConnectorConfig(data) {
+      return data.keys().hasAll(['id', 'userId', 'serviceId', 'isConnected']) &&
+        data.id is string && isValidId(data.id) &&
+        data.userId is string && isValidId(data.userId) &&
+        data.userId == request.auth.uid &&
+        data.serviceId is string && data.serviceId.size() <= 60 &&
+        data.isConnected is bool &&
+        (!('accountEmail' in data) || (data.accountEmail is string && data.accountEmail.size() <= 254));
+    }
+
+    // 1. Users collection (Public Profiles)
+    match /users/{userId} {
+      allow get, list: if true;
+      allow create: if (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidUserProfile(incoming());
+      allow update: if (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidUserProfile(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin();
+
+      // Split collection: Private User Info & Credentials
+      match /private/{docId} {
+        allow get: if (isOwner(userId) || isAdmin()) && isValidId(docId);
+        allow list: if (isOwner(userId) || isAdmin());
+        allow create, update: if (isOwner(userId) || isAdmin()) && isValidId(docId);
+        allow delete: if (isOwner(userId) || isAdmin()) && isValidId(docId);
+      }
+    }
+
+    // 2. Posts collection
+    match /posts/{postId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && isValidId(postId) && isValidPost(incoming()) && incoming().authorId == request.auth.uid;
+      allow update: if isSignedIn() && isValidId(postId) && isValidPost(incoming()) &&
+        (
+          isAdmin() ||
+          (
+            existing().authorId == request.auth.uid &&
+            incoming().authorId == existing().authorId &&
+            incoming().id == existing().id &&
+            incoming().createdAt == existing().createdAt
+          ) ||
+          (
+            // Interaction update (e.g. likes/comments count increment)
+            incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'commentsCount', 'updatedAt'])
+          )
+        );
+      allow delete: if isSignedIn() && isValidId(postId) && (existing().authorId == request.auth.uid || isAdmin());
+
+      // Sub-collection: Likes
+      match /likes/{likeId} {
+        allow get, list: if true;
+        allow create: if isSignedIn() && isValidId(likeId) && isValidPostLike(incoming()) &&
+          exists(/databases/$(database)/documents/posts/$(postId));
+        allow update: if false;
+        allow delete: if isSignedIn() && isValidId(likeId) && (existing().userId == request.auth.uid || isAdmin());
+      }
+
+      // Sub-collection: Comments
+      match /comments/{commentId} {
+        allow get, list: if true;
+        allow create: if isSignedIn() && isValidId(commentId) && isValidPostComment(incoming()) &&
+          exists(/databases/$(database)/documents/posts/$(postId));
+        allow update: if isSignedIn() && isValidId(commentId) && isValidPostComment(incoming()) &&
+          (existing().authorId == request.auth.uid || isAdmin()) &&
+          incoming().authorId == existing().authorId &&
+          incoming().postId == existing().postId;
+        allow delete: if isSignedIn() && isValidId(commentId) && (existing().authorId == request.auth.uid || isAdmin());
+      }
+    }
+
+    // 3. Realtime Chat Messages
+    match /chat_messages/{messageId} {
+      allow get: if isSignedIn() && isValidId(messageId);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(messageId) && isValidChatMessage(incoming());
+      allow update: if false;
+      allow delete: if isSignedIn() && isValidId(messageId) && (existing().senderId == request.auth.uid || isAdmin());
+    }
+
+    // 4. Connectors
+    match /connectors/{connectorId} {
+      allow get: if isSignedIn() && isValidId(connectorId) && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(connectorId) && isValidConnectorConfig(incoming());
+      allow update: if isSignedIn() && isValidId(connectorId) && isValidConnectorConfig(incoming()) &&
+        (existing().userId == request.auth.uid || isAdmin()) &&
+        incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && isValidId(connectorId) && (existing().userId == request.auth.uid || isAdmin());
+    }
+  }
+}

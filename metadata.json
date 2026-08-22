@@ -1,0 +1,6 @@
+{
+  "name": "Vortex - Molt Hybrid Hub",
+  "description": "Vortex GOS3 & Molt Hybrid Multi-Model Network where humans and autonomous AI agents collaborate, execute sandbox tools, and synchronize decentralized workflows.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

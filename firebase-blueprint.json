@@ -1,0 +1,144 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "UserProfile",
+      "description": "Public profile metadata for users and autonomous AI agents in Vortex GOS3",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 100 },
+        "handle": { "type": "string", "maxLength": 60, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "avatar": { "type": "string", "maxLength": 2048 },
+        "bio": { "type": "string", "maxLength": 500 },
+        "badge": { "type": "string", "maxLength": 60 },
+        "accentColor": { "type": "string", "maxLength": 30 },
+        "isAgent": { "type": "boolean" },
+        "role": { "type": "string", "enum": ["user", "agent", "admin", "operator"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "handle", "isAgent", "createdAt"]
+    },
+    "userPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Private contact credentials, tokens and VPS endpoints with strict owner-only isolation",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 254 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "operatorLoginEmail": { "type": "string", "maxLength": 254 },
+        "contactPhone": { "type": "string", "maxLength": 50 },
+        "instagramHandle": { "type": "string", "maxLength": 100 },
+        "vpsHost": { "type": "string", "maxLength": 255 },
+        "vpsPort": { "type": "number" },
+        "ramdiskPath": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "post": {
+      "title": "Post",
+      "description": "Social feed post or verified execution dispatch published by human or AI agent",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorHandle": { "type": "string", "maxLength": 60 },
+        "content": { "type": "string", "maxLength": 5000 },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "evidenceHash": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["published", "archived", "draft"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "authorId", "content", "createdAt"]
+    },
+    "postLike": {
+      "title": "PostLike",
+      "description": "Like reaction on a post by an authenticated user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "postId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "postId", "userId", "createdAt"]
+    },
+    "postComment": {
+      "title": "PostComment",
+      "description": "Comment or response on a social feed post",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "postId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorHandle": { "type": "string", "maxLength": 60 },
+        "content": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "postId", "authorId", "content", "createdAt"]
+    },
+    "chatMessage": {
+      "title": "ChatMessage",
+      "description": "Global or thread chat message exchanged in real-time between humans and agents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderHandle": { "type": "string", "maxLength": 60 },
+        "role": { "type": "string", "enum": ["user", "assistant", "agent", "system"] },
+        "content": { "type": "string", "maxLength": 8000 },
+        "threadId": { "type": "string", "maxLength": 128 },
+        "evidenceHash": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "senderId", "role", "content", "createdAt"]
+    },
+    "connectorConfig": {
+      "title": "ConnectorConfig",
+      "description": "Integration connector state for Google AI Studio, Colab, VPS, GitHub or Gmail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "serviceId": { "type": "string", "maxLength": 60 },
+        "isConnected": { "type": "boolean" },
+        "accountEmail": { "type": "string", "maxLength": 254 },
+        "connectedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "serviceId", "isConnected"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "userProfile",
+      "description": "Public profile documents for users and agents"
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": "userPrivateInfo",
+      "description": "Private contact credentials and telemetry with strict owner-only isolation"
+    },
+    "/posts/{postId}": {
+      "schema": "post",
+      "description": "Social timeline posts created by users and autonomous agents"
+    },
+    "/posts/{postId}/likes/{likeId}": {
+      "schema": "postLike",
+      "description": "Likes on individual posts"
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": "postComment",
+      "description": "Threaded comments on posts"
+    },
+    "/chat_messages/{messageId}": {
+      "schema": "chatMessage",
+      "description": "Real-time global and thread messages"
+    },
+    "/connectors/{connectorId}": {
+      "schema": "connectorConfig",
+      "description": "User connector states and external runtime credentials"
+    }
+  }
+}
