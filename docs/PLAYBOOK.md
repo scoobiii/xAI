@@ -1,9 +1,9 @@
-> **GOS3** · agente: `SeniorOpsScrum / Claude` · papel: `Lead Architect & Protocol Governance` (ver docs/team.md)
-> fase: `fase 5 — padronização e governança de especificações` · data: `2026-08-20` · hora: `14:09:00 UTC`
-> antes: Playbook básico com 3 tópicos preliminares
-> depois: Playbook completo e padronizado GOS3 (Cabeçalhos, Anti-Fabricação, Zero-Trust, Merge Gates e Sondas de Teste)
-> base: commit `gos3-core-v1.0`
-> assinatura: `SeniorOpsScrum · Protocol Governance · GOS3`
+> **GOS3** · agente: `SeniorOpsScrum / Claude / Gemini` · papel: `Lead Architect & Protocol Governance` (ver docs/team.md)
+> fase: `Technical Refinement (E4) & Visual Analytics Release` · data: `2026-08-22` · hora: `18:30:00 UTC`
+> antes: Playbook cobria até a regra 6 (ADR-003)
+> depois: Playbook completo GOS3 v1.2 (Cabeçalhos, Anti-Fabricação, Zero Fake Provider INC-002, Merge Gates e ADR-003)
+> base: commit `gos3-core-v1.2`
+> assinatura: `SeniorOpsScrum & Gemini · Protocol Governance · GOS3`
 
 # PLAYBOOK — Vortex / GOS3 Protocol Standards
 
@@ -32,11 +32,12 @@ Todo arquivo criado ou editado por qualquer agente no ecossistema GOS3 **deve** 
 
 ---
 
-## 3. Protocolo de Prova de Execução (Zero-Trust Anti-Fabricação)
+## 3. Protocolo de Prova de Execução & Zero Fake Provider (Zero-Trust Anti-Fabricação)
 
 - **Se executou**: capturar `exit_code`, `stdout_raw`, `executionTimeMs` e gerar `evidenceHash` (SHA-256).
 - **Se não executou ou falhou**: retornar explicitamente `executed: false`, `success: false` e detalhes em `logs`.
-- **Ausência de credencial de serviço externo**: retornar `status: "auth_required"` com log explicativo; **jamais gerar texto estático que simule chamadas de API remotas**.
+- **Ausência de credencial de serviço externo**: retornar `status: "auth_required"` ou rotular o provedor honestamente como `provider: "local_simulation"` / `provider: "slm_fallback"`. **Jamais gerar texto estático que finja ser o provedor proprietário sem a chave correspondente presente (INC-002)**.
+- **Obediência a Prompts de Controle**: Em modo de simulação, respeitar comandos literais e de teste sem despejar templates genéricos de persona.
 
 ---
 
@@ -62,5 +63,6 @@ Antes de considerar qualquer entrega concluída, o agente deve executar os segui
 1. **Injeção Direta**: Conteúdo técnico (código, logs, especificações) deve ser colado diretamente na conversa/contexto.
 2. **Dumps Locais**: Para arquivos volumosos, use dumps gerados localmente (`scripts/scrape_repo.py` ou arquivos de texto).
 3. **URLs Externas e Bloqueios WAF**: Não presumir que links públicos de terceiros (`claude.ai/share`, etc.) são acessíveis por agentes. Sem tool call real em sandbox liberada, declare obrigatoriamente `claim: "not_executed"`.
+
 
 

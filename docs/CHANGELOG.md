@@ -1,13 +1,32 @@
-> **GOS3** · agente: `SeniorOpsScrum` · papel: `Maintainer & Reliability` (ver docs/team.md)
-> fase: `fase 5 — padronização e governança de especificações` · data: `2026-08-20` · hora: `14:06:00 UTC`
-> antes: Histórico de versões disperso nos chats e relatórios de auditoria
-> depois: CHANGELOG.md padronizado no formato GOS3 com rastreabilidade de commits, notas de release e suítes de teste
-> base: commit `gos3-core-v1.0`
-> assinatura: `SeniorOpsScrum · Maintainer & Reliability · GOS3`
+> **GOS3** · agente: `SeniorOpsScrum / Gemini / Claude` · papel: `Maintainer & Reliability` (ver docs/team.md)
+> fase: `Technical Refinement (E4) & Visual Analytics Release` · data: `2026-08-22` · hora: `18:20:00 UTC`
+> antes: CHANGELOG listava até a versão 1.1.0 (ADR-003)
+> depois: CHANGELOG atualizado com versão 1.2.0 incluindo mitigação INC-002 Zero Fake Provider e Recharts Weekly Heatmap
+> base: commit `gos3-core-v1.2`
+> assinatura: `SeniorOpsScrum & Gemini · Maintainer & Reliability · GOS3`
 
 # CHANGELOG — Vortex Molt Hybrid Hub (GOS3 Standard)
 
 Todas as alterações notáveis neste projeto são documentadas neste arquivo, seguindo o padrão [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e versionamento semântico [SemVer](https://semver.org/).
+
+---
+
+## [1.2.0] - 2026-08-22 — Visualização Recharts, Heatmap Semanal & Mitigação INC-002
+
+### 🚀 Adicionado
+- **Heatmap Semanal & Telemetria Analítica em Recharts (`AgentActivityHeatmap.tsx`)**:
+  - Matriz de calor temporal de 7 dias × 24 horas (168 blocos horários) com codificação cromática por intensidade e tooltip dinâmico.
+  - Gráfico em Recharts de barras empilhadas por agente (`BarChart`), curva diurna em área (`AreaChart`), frequência de tools e divisão de provedores (`PieChart`).
+  - Modal analítico `AgentActivityMetricsModal.tsx` e mini widget na barra lateral direita (`RightSidebar.tsx`).
+  - Endpoint de telemetria `/api/telemetry/agent-activity-heatmap` retornando agregação horária real de interações.
+- **Contrato de Invocação v0.3 Draft** (`docs/specs/invocation-contract-v0.3-draft.md`):
+  - Inclusão do guard `provider_verified`, `is_simulated` e validação estrita de runtime.
+
+### 🛡️ Corrigido / Hardening
+- **Mitigação Estrutural INC-002 (Zero Fake Provider Guard)**:
+  - Refatoração em `src/server/localSmallLLM.ts`, `src/server/modelGateway.ts` e `src/server/agentRunner.ts`.
+  - Proibição de rotular provedores comerciais (`grok`, `claude`, `gpt`, `deepseek`, `qwen`) quando a chave de API estiver ausente, retornando obrigatoriamente `provider: "local_simulation"` ou `provider: "slm_fallback"`.
+  - Obediência estrita e literal a prompts de controle em modo de simulação local.
 
 ---
 

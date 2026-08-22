@@ -1,14 +1,14 @@
 > **GOS3** · agente: `GPT / Claude / Gemini` · papel: `Maintainer / Protocol Governance` (ver docs/team.md)
-> fase: `Technical Refinement (E4)` · data: `2026-08-22` · hora: `17:35:00 UTC`
-> antes: Backlog cobria até o Sprint 4 sem o item de resolução de rotulagem do INC-002
-> depois: Backlog atualizado incluindo a tarefa de mitigação estrutural do INC-002 e especificação v0.3
-> base: commit `gos3-core-v1.0`, INC-002
+> fase: `Technical Refinement (E4) & Visual Analytics Release` · data: `2026-08-22` · hora: `18:15:00 UTC`
+> antes: Backlog com pendências do Sprint 5 em aberto
+> depois: Backlog atualizado com Sprint 5 100% concluído (mitigação INC-002, contrato v0.3 e visualização Recharts)
+> base: commit `gos3-core-v1.1`, INC-002, ADR-003
 > assinatura: `GOS3 Maintainer & Protocol Governance · GOS3`
 
 # BACKLOG — Vortex / GOS3 (v1.1.0 Oficial)
 
 ## Fase Atual
-**GOS3 v1.1 Refinement** — Governança, Anti-Fabricação Estrutural e Handoff Canônico
+**GOS3 v1.1 Refinement & Analytics** — Governança, Anti-Fabricação Estrutural, Handoff Canônico e Visualização Recharts
 
 ---
 
@@ -52,15 +52,16 @@
 
 ---
 
-## Sprint 5 — Mitigação INC-002, ADR-003 & Governança v0.3 — [EM ANDAMENTO]
+## Sprint 5 — Mitigação INC-002, ADR-003, Recharts Analytics & Governança v0.3 — [CONCLUÍDO]
 - [x] **ADR-003**: Handoff Direto de Conteúdo e Proibição de Dependência de Links Externos (`docs/decisions.md` e `docs/specs/pattern-external-url-access.md`)
 - [x] **INC-002 Registrado**: Post-mortem formalizado com evidência de código em `docs/incidents.md`
-- [ ] **#ISSUE-inc002-zero-fake-provider**: Refatoração estrutural em `src/server/localSmallLLM.ts` e `src/server/agentRunner.ts` para setar `provider: "local_simulation"` ou `provider: "slm_fallback"` quando a chave de API externa não estiver presente
-- [ ] **#ISSUE-contract-v0.3-provider-guard**: Atualizar especificação do contrato de invocação para proibir rotulagem estática positiva sem chave presente em `process.env`
+- [x] **#ISSUE-inc002-zero-fake-provider**: Refatoração estrutural em `src/server/localSmallLLM.ts`, `src/server/modelGateway.ts` e `src/server/agentRunner.ts` para setar `provider: "local_simulation"` ou `provider: "slm_fallback"` quando a chave de API externa não estiver presente
+- [x] **#ISSUE-contract-v0.3-provider-guard**: Atualizar especificação do contrato de invocação para proibir rotulagem estática positiva sem chave presente em `process.env` (`docs/specs/invocation-contract-v0.3-draft.md`)
+- [x] **#ISSUE-recharts-weekly-heatmap**: Componente de telemetria analítica com matriz 7x24, gráficos de área, barras empilhadas e divisão de tools (`src/components/telemetry/AgentActivityHeatmap.tsx` e `AgentActivityMetricsModal.tsx`)
 
 ---
 
-## Próximos Passos & Evolução (GOS3 v1.1+ Roadmap)
+## Próximos Passos & Evolução (GOS3 v1.2+ Roadmap)
 - [ ] Orquestração descentralizada P2P entre nós de agentes remotos
 - [ ] Emissão e ancoragem periódica de árvores Merkle de execução em rede blockchain pública
 - [ ] Monitoramento contínuo de drift semântico nos embeddings de memória vetorial

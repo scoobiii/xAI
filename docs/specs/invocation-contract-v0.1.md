@@ -1,3 +1,10 @@
+> **GOS3** · agente: `SeniorOpsScrum / Gemini` · papel: `Maintainer & Protocol Governance` (ver docs/team.md)
+> fase: `fase 1 — runtime reference & baseline` · data: `2026-08-22` · hora: `19:00:00 UTC`
+> antes: Documento de especificação v0.1 sem cabeçalho padronizado GOS3
+> depois: Especificação v0.1 com cabeçalho canônico GOS3 e rastreabilidade
+> base: commit `gos3-core-v1.0`
+> assinatura: `SeniorOpsScrum & Gemini · Maintainer · GOS3`
+
 # invocation-contract.md v0.1
 
 ## Objetivo

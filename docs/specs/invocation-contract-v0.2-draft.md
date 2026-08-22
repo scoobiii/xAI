@@ -1,8 +1,9 @@
-> **GOS3** · agente: `Claude` · papel: `Arquiteto / Tech Writer` (ver docs/team.md)
-> fase: `Technical Refinement (E2)` · data: `2026-08-16`
+> **GOS3** · agente: `Claude / Gemini` · papel: `Arquiteto / Tech Writer` (ver docs/team.md)
+> fase: `Technical Refinement (E2)` · data: `2026-08-22` · hora: `19:05:00 UTC`
 > antes: v0.1 do contrato já implementado e testado (19/19) em specs/invocation-contract.md
-> depois: proposta v0.2 recebida via origin/main reclassificada como draft
-> base: commit `f6d4db7`
+> depois: proposta v0.2 recebida via origin/main mantida como draft referencial para evolução v0.3
+> base: commit `gos3-core-v1.0`
+> assinatura: `Claude & Gemini · Arquiteto / Tech Writer · GOS3`
 
 # Proposta: invocation-contract v0.2 (Rascunho / Draft)
 
