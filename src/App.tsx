@@ -24,6 +24,7 @@ import { ToastContainer } from "./components/notifications/ToastContainer";
 import { GrokCleanAssistantView } from "./components/grok/GrokCleanAssistantView";
 import { ConnectorsModal } from "./components/connectors/ConnectorsModal";
 import { GoogleColabChatSandbox } from "./components/sandbox/GoogleColabChatSandbox";
+import { AgentActivityMetricsModal } from "./components/telemetry/AgentActivityMetricsModal";
 import { Loader2, RefreshCw, Sparkles, Bot, Terminal, Swords, Compass } from "lucide-react";
 
 export default function App() {
@@ -53,6 +54,7 @@ export default function App() {
   const [isK6Open, setIsK6Open] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [isConnectorsOpen, setIsConnectorsOpen] = useState(false);
+  const [isActivityMetricsOpen, setIsActivityMetricsOpen] = useState(false);
 
   // Initial Data Fetch & Auth Persistence
   const fetchData = async () => {
@@ -255,6 +257,8 @@ export default function App() {
           onOpenGOS3Live={() => setIsGOS3LiveOpen(true)}
           onOpenK6={() => setIsK6Open(true)}
           onOpenVoice={() => setIsVoiceOpen(true)}
+          onOpenConnectors={() => setIsConnectorsOpen(true)}
+          onOpenActivityMetrics={() => setIsActivityMetricsOpen(true)}
         />
 
         {/* Center Main Feed or Directory */}
@@ -274,6 +278,9 @@ export default function App() {
                 onOpenAuth={() => setIsAuthModalOpen(true)}
                 onOpenChat={() => setIsChatHubOpen(true)}
                 onOpenBilling={() => setIsBillingOpen(true)}
+                onOpenGrokClean={() => setCurrentView("grok_clean")}
+                onOpenConnectors={() => setIsConnectorsOpen(true)}
+                onOpenActivityMetrics={() => setIsActivityMetricsOpen(true)}
               />
 
               {/* Compose Box */}
@@ -333,6 +340,7 @@ export default function App() {
           }}
           onMentionAgent={handleMentionInFeed}
           onViewAgentProfile={(ag) => setActiveAgentProfile(ag)}
+          onOpenActivityMetrics={() => setIsActivityMetricsOpen(true)}
         />
       </div>
 
@@ -474,6 +482,17 @@ export default function App() {
         onClose={() => setIsVoiceOpen(false)}
         agents={agents}
         currentUser={currentUser}
+      />
+
+      {/* 15. Agent Activity Weekly Heatmap & Interaction Frequency Telemetry Modal (Recharts) */}
+      <AgentActivityMetricsModal
+        isOpen={isActivityMetricsOpen}
+        onClose={() => setIsActivityMetricsOpen(false)}
+        agents={agents}
+        onSelectAgentProfile={(ag) => {
+          setIsActivityMetricsOpen(false);
+          setActiveAgentProfile(ag);
+        }}
       />
     </div>
   );

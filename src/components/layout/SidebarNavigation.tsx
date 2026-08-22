@@ -19,6 +19,7 @@ import {
   Mic,
   Grid2X2,
   Compass,
+  BarChart3,
 } from "lucide-react";
 
 interface Props {
@@ -39,6 +40,7 @@ interface Props {
   onOpenK6?: () => void;
   onOpenVoice?: () => void;
   onOpenConnectors?: () => void;
+  onOpenActivityMetrics?: () => void;
 }
 
 export const SidebarNavigation: React.FC<Props> = ({
@@ -59,6 +61,7 @@ export const SidebarNavigation: React.FC<Props> = ({
   onOpenK6,
   onOpenVoice,
   onOpenConnectors,
+  onOpenActivityMetrics,
 }) => {
   const [showSwitchMenu, setShowSwitchMenu] = React.useState(false);
 
@@ -251,6 +254,22 @@ export const SidebarNavigation: React.FC<Props> = ({
             <Activity className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform animate-pulse" />
             <span className="hidden sm:inline">K6 Load Testing</span>
           </button>
+
+          {/* Weekly Heatmap & Agent Interaction Frequency (Recharts) */}
+          {onOpenActivityMetrics && (
+            <button
+              id="nav-link-heatmap-metrics"
+              onClick={onOpenActivityMetrics}
+              className="w-full flex items-center gap-3.5 px-3 py-2.5 rounded-2xl font-semibold text-sm text-purple-300 hover:text-white bg-purple-950/30 hover:bg-purple-900/50 border border-purple-800/40 transition-all group shadow-sm"
+              title="Heatmap Semanal & Frequência de Interação de Agentes (Recharts)"
+            >
+              <BarChart3 className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
+              <span className="hidden sm:inline">Heatmap & Métricas</span>
+              <span className="hidden sm:inline ml-auto text-[9px] px-1.5 py-0.5 rounded bg-purple-900/80 text-purple-200 border border-purple-700/50 font-mono">
+                Recharts
+              </span>
+            </button>
+          )}
         </nav>
 
         {/* Primary Action Buttons */}

@@ -1,6 +1,6 @@
 import React from "react";
 import { FeedFilter, UserAccount } from "../../types";
-import { Sparkles, Bot, User, Flame, X, ShieldCheck, LogIn, MessageSquare, Zap, Compass, Grid2X2 } from "lucide-react";
+import { Sparkles, Bot, User, Flame, X, ShieldCheck, LogIn, MessageSquare, Zap, Compass, Grid2X2, BarChart3 } from "lucide-react";
 
 interface Props {
   currentFilter: FeedFilter;
@@ -13,6 +13,7 @@ interface Props {
   onOpenBilling?: () => void;
   onOpenGrokClean?: () => void;
   onOpenConnectors?: () => void;
+  onOpenActivityMetrics?: () => void;
 }
 
 export const Header: React.FC<Props> = ({
@@ -26,6 +27,7 @@ export const Header: React.FC<Props> = ({
   onOpenBilling,
   onOpenGrokClean,
   onOpenConnectors,
+  onOpenActivityMetrics,
 }) => {
   return (
     <header className="sticky top-0 z-20 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800 text-neutral-100">
@@ -50,6 +52,18 @@ export const Header: React.FC<Props> = ({
         </h1>
 
         <div className="flex items-center gap-2">
+          {onOpenActivityMetrics && (
+            <button
+              id="header-heatmap-metrics-btn"
+              onClick={onOpenActivityMetrics}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-950/80 hover:bg-purple-900 border border-purple-800/60 text-xs text-purple-200 font-semibold transition-all hover:scale-105"
+              title="Ver Heatmap Semanal e Frequência de Agentes (Recharts)"
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden md:inline">Heatmap & Métricas</span>
+            </button>
+          )}
+
           {onOpenGrokClean && (
             <button
               id="header-grok-btn"

@@ -1,5 +1,6 @@
 import React from "react";
 import { UserAccount } from "../../types";
+import { AgentActivityHeatmap } from "../telemetry/AgentActivityHeatmap";
 import {
   Search,
   TrendingUp,
@@ -9,6 +10,7 @@ import {
   Zap,
   Activity,
   Cpu,
+  BarChart3,
 } from "lucide-react";
 
 interface Props {
@@ -16,6 +18,7 @@ interface Props {
   onSelectTag: (tag: string) => void;
   onMentionAgent: (agent: UserAccount) => void;
   onViewAgentProfile: (agent: UserAccount) => void;
+  onOpenActivityMetrics?: () => void;
 }
 
 const TRENDING_TOPICS = [
@@ -31,6 +34,7 @@ export const RightSidebar: React.FC<Props> = ({
   onSelectTag,
   onMentionAgent,
   onViewAgentProfile,
+  onOpenActivityMetrics,
 }) => {
   return (
     <aside
@@ -63,6 +67,12 @@ export const RightSidebar: React.FC<Props> = ({
           </div>
         </div>
       </div>
+
+      {/* Weekly Heatmap Activity Widget (Recharts) */}
+      <AgentActivityHeatmap
+        compact={true}
+        onOpenDetailedModal={onOpenActivityMetrics}
+      />
 
       {/* Trending Topics */}
       <div className="p-4 rounded-2xl bg-neutral-900/40 border border-neutral-800/80">
