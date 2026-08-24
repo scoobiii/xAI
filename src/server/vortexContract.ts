@@ -1,18 +1,16 @@
 import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 
 /**
- * Vortex Invocation Contract Implementation (spec/invocation-contract.md)
- * 
- * Regras estritas de conformidade:
- * 1. Sem shadowing de `process` (evita ReferenceError / Temporal Dead Zone).
- * 2. `killSignal: "SIGKILL"` explícito para garantir terminação irrecusável em timeout.
- * 3. Sem fallbacks de template disfarçados: ausência de chave ou erro de rede resulta
- *    em `claim: "not_executed"` ou `claim: "failed"`.
- * 4. Saída 100% tipada com hash SHA-256 e prova de execução do kernel/processo real.
+ * > **GOS3** · agente: `Gemini / ProtocolEngine` · papel: `GOS3 Invocation Contract & Runtime ID Engine`
+ * > fase: `Fase 5 — ADR-003 & Contrato v0.1 Padronizado` · data: `2026-08-23`
+ * > antes: Divergência entre instâncias Termux e Cloud Run, risco de simulação de execução sem prova formal
+ * > depois: Contrato v0.1 com runtime_id determinístico de 64 hex, evidence_hash obrigatório e execução real
+ * > base: commit `gos3-core-v1.2`, ADR-003, INC-001
+ * > assinatura: `Gemini · ProtocolEngine · GOS3`
  */
 
 export interface ExecutionProof {
@@ -33,8 +31,116 @@ export interface ExecutionProof {
   timestamp: string;
 }
 
+export interface GOS3ContractEnvelope<T = any> {
+  executed: boolean;
+  status: "success" | "failed";
+  output: T;
+  duration_ms: number;
+  evidence_hash: string;
+  contract_version: "v0.1";
+  invocation_id: string;
+  agent: string;
+  truncated: boolean;
+  runtime_id: string;
+}
+
 export const sha256 = (s: string): string =>
   createHash("sha256").update(s, "utf-8").digest("hex");
+
+/**
+ * Gera o runtime_id único e determinístico para a instância atual (64 hex characters).
+ * Distingue formalmente instâncias Termux/Android, Cloud Run, VPS ou Isolate.
+ */
+export function getRuntimeId(): string {
+  const envTag = process.env.GOS3_ENV_TAG || process.env.K_SERVICE ? "cloud-run" : "node-linux";
+  const hostname = os.hostname() || "localhost";
+  const platform = os.platform() || "linux";
+  const arch = os.arch() || "x64";
+  const rawId = `GOS3-RUNTIME:${envTag}:${hostname}:${platform}:${arch}:${process.pid}`;
+  return sha256(rawId);
+}
+
+/**
+ * Constrói o envelope canônico do contrato v0.1 com cálculo estrito de evidence_hash e runtime_id.
+ */
+export function buildContractEnvelope<T = any>(params: {
+  agent: string;
+  output: T;
+  duration_ms: number;
+  status?: "success" | "failed";
+  truncated?: boolean;
+  invocation_id?: string;
+  rawStdout?: string;
+  rawStderr?: string;
+  exitCode?: number;
+}): GOS3ContractEnvelope<T> {
+  const status = params.status || "success";
+  const executed = status === "success";
+  const invocation_id = params.invocation_id || `inv-${Date.now()}-${randomUUID().slice(0, 8)}`;
+  const runtime_id = getRuntimeId();
+
+  // Cálculo canônico do evidence_hash conforme ADR-002 e ADR-003:
+  // sha256(stdout + stderr + exit_code + duration_ms) ou sha256(canonical JSON)
+  const stdout = params.rawStdout ?? (typeof params.output === "string" ? params.output : JSON.stringify(params.output));
+  const stderr = params.rawStderr ?? "";
+  const exitCode = params.exitCode ?? (status === "success" ? 0 : 1);
+  const evidence_hash = sha256(`${stdout}${stderr}${exitCode}${params.duration_ms}`);
+
+  return {
+    executed,
+    status,
+    output: params.output,
+    duration_ms: params.duration_ms,
+    evidence_hash,
+    contract_version: "v0.1",
+    invocation_id,
+    agent: params.agent,
+    truncated: params.truncated ?? false,
+    runtime_id,
+  };
+}
+
+/**
+ * Validador estrito do contrato v0.1
+ */
+export function validateContractEnvelope(envelope: any): { valid: boolean; reason?: string } {
+  if (!envelope || typeof envelope !== "object") {
+    return { valid: false, reason: "Envelope nulo ou formato inválido" };
+  }
+
+  const requiredFields = [
+    "executed",
+    "status",
+    "output",
+    "duration_ms",
+    "evidence_hash",
+    "contract_version",
+    "invocation_id",
+    "agent",
+    "truncated",
+    "runtime_id",
+  ];
+
+  for (const field of requiredFields) {
+    if (envelope[field] === undefined) {
+      return { valid: false, reason: `Campo obrigatório ausente: ${field}` };
+    }
+  }
+
+  if (typeof envelope.evidence_hash !== "string" || envelope.evidence_hash.length !== 64) {
+    return { valid: false, reason: "evidence_hash deve ser string hex de 64 caracteres" };
+  }
+
+  if (typeof envelope.runtime_id !== "string" || envelope.runtime_id.length !== 64) {
+    return { valid: false, reason: "runtime_id deve ser string hex de 64 caracteres (ADR-003)" };
+  }
+
+  if (envelope.contract_version !== "v0.1") {
+    return { valid: false, reason: `Versão de contrato não suportada: ${envelope.contract_version}` };
+  }
+
+  return { valid: true };
+}
 
 /**
  * Executa código Python real em subprocesso isolado no host Linux/POSIX.

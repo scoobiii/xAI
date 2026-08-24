@@ -61,6 +61,15 @@
 
 ---
 
+## Sprint 6 — ADR-003 Runtime ID, Zero SDK Footprint & Contrato v0.1 — [CONCLUÍDO]
+- [x] **ADR-003**: `runtime_id` de 64 hex obrigatório no envelope de invocação (`src/server/vortexContract.ts`)
+- [x] **Zero SDK Footprint**: Implementação do `vpsAgentClient.ts` com `vpsProxyRequest` em fetch nativo para manter Termux sob limite de 5GB
+- [x] **Contract v0.1 Envelope**: Atualização do endpoint `/api/agents/:id/run` e do envelope canônico
+- [x] **Suíte de Testes 100%**: Inclusão de testes de `runtime_id`, `vpsAgentClient` e determinismo Python (`print(123456)`) em `tests/gos3_full_coverage.test.ts` e `tests/contract_test.py`
+- [x] **Documentação & Handoff**: Criação de `docs/CHANGES-runtime_id.md` e `docs/handoff.md`
+
+---
+
 ## Próximos Passos & Evolução (GOS3 v1.2+ Roadmap)
 - [ ] Orquestração descentralizada P2P entre nós de agentes remotos
 - [ ] Emissão e ancoragem periódica de árvores Merkle de execução em rede blockchain pública

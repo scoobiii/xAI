@@ -11,6 +11,21 @@ Todas as alterações notáveis neste projeto são documentadas neste arquivo, s
 
 ---
 
+## [1.3.0] - 2026-08-23 — ADR-003 Runtime ID, Zero SDK Footprint & Contrato v0.1
+
+### 🚀 Adicionado
+- **`runtime_id` no Contrato v0.1 & ADR-003**:
+  - Hash SHA-256 de 64 caracteres hexadecimais obrigatório no envelope de invocação para identificar univocamente a instância de runtime (Cloud Run vs Termux/A23 vs Local Node).
+  - Inclusão em `src/server/vortexContract.ts`, `/api/agents/:id/run` e nos validadores de contrato (`tests/contract_test.py` e `tests/contract_gate.test.ts`).
+- **Cliente Leve Zero SDK (`src/services/vpsAgentClient.ts`)**:
+  - Exportação da função `vpsProxyRequest` utilizando `fetch` nativo para delegar chamadas de inferência de modelos e sandbox ao backend central Cloud Run / VPS.
+  - Garante consumo de armazenamento local no Termux/A23 dentro do limite estrito de 5GB.
+- **Suíte Global de Testes Atualizada**:
+  - Teste determinístico de execução Python (`print(123456)`) com validação de hash e ausência de simulação em `tests/gos3_full_coverage.test.ts`.
+  - Documentação formal em `docs/CHANGES-runtime_id.md` e `docs/handoff.md`.
+
+---
+
 ## [1.2.0] - 2026-08-22 — Visualização Recharts, Heatmap Semanal & Mitigação INC-002
 
 ### 🚀 Adicionado

@@ -15,6 +15,7 @@ import { FormalSkillVerifier } from "./src/server/formalVerifier";
 import { K6RunnerService } from "./src/server/k6Runner";
 import { GOS3Service } from "./src/server/gos3Service";
 import { N8nVoiceService } from "./src/server/n8nVoiceService";
+import { buildContractEnvelope, getRuntimeId } from "./src/server/vortexContract";
 import { ModelProviderId, Post } from "./src/types";
 
 async function startServer() {
@@ -583,15 +584,46 @@ async function startServer() {
   });
 
   app.post("/api/agents/:id/run", async (req, res) => {
+    const startTime = Date.now();
     try {
       const agent = storage.getUserById(req.params.id);
       if (!agent || !agent.isAgent) return res.status(404).json({ error: "Agent not found" });
 
       const { prompt, threadHistory, mentions } = req.body;
       const result = await AgentRunner.runAgent(agent, prompt || "Execute analysis and share findings", threadHistory, mentions);
-      res.json(result);
+      const durationMs = Date.now() - startTime;
+
+      const envelope = buildContractEnvelope({
+        agent: agent.handle,
+        output: result.content,
+        duration_ms: durationMs,
+        status: "success",
+        rawStdout: result.codeArtifact?.stdout || result.content,
+      });
+
+      res.json({
+        ...result,
+        executed: true,
+        status: "success",
+        output: result.content,
+        duration_ms: durationMs,
+        evidence_hash: envelope.evidence_hash,
+        contract_version: "v0.1",
+        invocation_id: envelope.invocation_id,
+        agent: agent.handle,
+        truncated: false,
+        runtime_id: envelope.runtime_id,
+      });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      const durationMs = Date.now() - startTime;
+      res.status(500).json({
+        error: err.message,
+        executed: false,
+        status: "failed",
+        duration_ms: durationMs,
+        runtime_id: getRuntimeId(),
+        contract_version: "v0.1",
+      });
     }
   });
 

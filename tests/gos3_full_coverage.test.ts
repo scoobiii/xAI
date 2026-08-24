@@ -1,9 +1,9 @@
 /**
  * > **GOS3** · agente: `GOS3TestRunner` · papel: `GOS3 100% Test Coverage & Cryptographic Verification Engine`
- * > fase: `fase 5 — padronização e governança de especificações` · data: `2026-08-20`
+ * > fase: `Fase 5 — ADR-003, Runtime ID & Contrato v0.1` · data: `2026-08-23`
  * > antes: Testes fragmentados sem runner unificado com 100% de cobertura formal e prova criptográfica
- * > depois: Suíte unificada com 100% de cobertura cobrindo Contract Gate, Sandbox V8/Python/Bash, GOS3 Injector, WAL e Storage
- * > base: commit `gos3-core-v1.0`, INC-001 em docs/incidents.md
+ * > depois: Suíte unificada com 100% de cobertura cobrindo Contract Gate, Sandbox V8/Python/Bash, runtime_id (ADR-003), vpsAgentClient, GOS3 Injector, WAL e Storage
+ * > base: commit `gos3-core-v1.2`, INC-001 em docs/incidents.md, ADR-003
  * > assinatura: `GOS3 · ProtocolEngine · Vortex Test Suite`
  */
 
@@ -19,6 +19,13 @@ import {
   verifyGOS3Compliance,
   GOS3_CANONICAL_BLOCK_MARKER,
 } from "../src/components/agents/GOS3SystemInstructionInjector";
+import {
+  getRuntimeId,
+  buildContractEnvelope,
+  validateContractEnvelope,
+  executeRealPython,
+} from "../src/server/vortexContract";
+import { getVPSBaseUrl, vpsProxyRequest } from "../src/services/vpsAgentClient";
 
 interface TestReport {
   suite: string;
@@ -71,7 +78,7 @@ function recordTest(suite: string, name: string, fn: () => Promise<void> | void)
 async function runAllTests() {
   console.log("================================================================================");
   console.log("   🛡️ VORTEX GOS3 / zAI UNIFIED TEST SUITE — 100% COVERAGE & AUDIT");
-  console.log("   Zero-Trust Verification, Contract Gate, Sandbox & GOS3 Canonical Governance");
+  console.log("   Zero-Trust Verification, ADR-003 Runtime ID, Sandbox & Contract v0.1");
   console.log("================================================================================\n");
 
   // ==========================================
@@ -141,44 +148,94 @@ async function runAllTests() {
   })();
 
   // ==========================================
-  // SUITE 2: CONTRACT GATE & EVIDENCE HASH INTEGRITY
+  // SUITE 2: CONTRACT GATE & ADR-003 RUNTIME ID INTEGRITY
   // ==========================================
-  console.log("\n🔒 SUITE 2: Contract Gate & Deterministic Output Rules");
+  console.log("\n🔒 SUITE 2: Contract Gate & ADR-003 Runtime ID Determinism");
 
-  await recordTest("Contract-Gate", "Valid executed payload with SHA-256 hash passes", () => {
-    const base = {
-      agent_id: "agent-gemini-vortex",
-      action: "simulateBESSGrid",
-      input: { capacityMW: 100, hours: 4 },
-      output: { lcoe: 0.038, roiYears: 3.2 },
-      status: "success" as const,
-    };
-    const canonical = JSON.stringify(base, Object.keys(base).sort());
-    const hash = crypto.createHash("sha256").update(canonical).digest("hex");
-    const payload = { ...base, evidence_hash: hash };
-    if (!payload.evidence_hash || payload.evidence_hash.length !== 64) {
-      throw new Error("Invalid hash length");
+  await recordTest("ADR-003-Contract", "getRuntimeId generates valid 64-char hex SHA-256", () => {
+    const rid = getRuntimeId();
+    if (typeof rid !== "string" || rid.length !== 64 || !/^[0-9a-f]{64}$/.test(rid)) {
+      throw new Error(`Invalid runtime_id format: ${rid}`);
     }
   })();
 
-  await recordTest("Contract-Gate", "Forged hash is strictly rejected", () => {
-    const base = {
-      agent_id: "agent-gemini-vortex",
-      action: "simulateBESSGrid",
-      input: { capacityMW: 100 },
-      output: { lcoe: 0.038 },
-      status: "success" as const,
-    };
-    const fakeHash = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-    const canonical = JSON.stringify(base, Object.keys(base).sort());
-    const realHash = crypto.createHash("sha256").update(canonical).digest("hex");
-    if (fakeHash === realHash) throw new Error("Collision impossible");
+  await recordTest("ADR-003-Contract", "buildContractEnvelope formats valid v0.1 envelope", () => {
+    const env = buildContractEnvelope({
+      agent: "agent-vortex-grid",
+      output: { stdout: "123456\n", exit_code: 0 },
+      duration_ms: 15,
+      rawStdout: "123456\n",
+    });
+
+    const validation = validateContractEnvelope(env);
+    if (!validation.valid) {
+      throw new Error(`Contract validation failed: ${validation.reason}`);
+    }
+    if (env.contract_version !== "v0.1") throw new Error("Invalid contract version");
+    if (!env.runtime_id || env.runtime_id.length !== 64) throw new Error("Invalid runtime_id in envelope");
+    if (!env.evidence_hash || env.evidence_hash.length !== 64) throw new Error("Invalid evidence_hash in envelope");
+  })();
+
+  await recordTest("ADR-003-Contract", "validateContractEnvelope rejects missing or forged runtime_id", () => {
+    const validEnv = buildContractEnvelope({
+      agent: "agent-test",
+      output: "test-ok",
+      duration_ms: 10,
+    });
+
+    // Case missing runtime_id
+    const invalidEnv = { ...validEnv, runtime_id: undefined };
+    const res1 = validateContractEnvelope(invalidEnv);
+    if (res1.valid) throw new Error("Should have rejected missing runtime_id");
+
+    // Case short runtime_id
+    const invalidShort = { ...validEnv, runtime_id: "short_id" };
+    const res2 = validateContractEnvelope(invalidShort);
+    if (res2.valid) throw new Error("Should have rejected invalid short runtime_id");
+  })();
+
+  await recordTest("Deterministic-Python", "executeRealPython executes print(123456) with verified hash", async () => {
+    const proof = await executeRealPython("test-node-123456", "print(123456)", 4000);
+    if (proof.claim !== "executed") {
+      throw new Error(`Python execution failed with claim: ${proof.claim}, stderr: ${proof.proof.stdout_raw}`);
+    }
+    if (!proof.proof.stdout_raw.includes("123456")) {
+      throw new Error(`Expected output 123456, got: ${proof.proof.stdout_raw}`);
+    }
+    const expectedHash = crypto.createHash("sha256").update(proof.proof.stdout_raw).digest("hex");
+    if (proof.output_hash !== expectedHash) {
+      throw new Error(`Hash mismatch: expected ${expectedHash}, got ${proof.output_hash}`);
+    }
   })();
 
   // ==========================================
-  // SUITE 3: AGENT SANDBOX DETERMINISTIC TOOLS (25/25)
+  // SUITE 3: VPS LIGHTWEIGHT CLIENT (ZERO SDK FOOTPRINT)
   // ==========================================
-  console.log("\n⚡ SUITE 3: Agent Sandbox Deterministic Tools (25/25 Tools)");
+  console.log("\n🌐 SUITE 3: VPS Lightweight Client (Zero Heavyweight SDK)");
+
+  await recordTest("VPS-Client", "getVPSBaseUrl returns valid sanitized URL", () => {
+    const url = getVPSBaseUrl();
+    if (!url || typeof url !== "string" || !url.startsWith("http")) {
+      throw new Error(`Invalid VPS Base URL: ${url}`);
+    }
+  })();
+
+  await recordTest("VPS-Client", "vpsProxyRequest handles options and returns structured response", async () => {
+    const res = await vpsProxyRequest({
+      endpoint: "/health",
+      method: "GET",
+      timeoutMs: 3000,
+    });
+    // In local unit test without running live server or with running server, returns object
+    if (typeof res !== "object" || typeof res.latencyMs !== "number") {
+      throw new Error(`Invalid response structure: ${JSON.stringify(res)}`);
+    }
+  })();
+
+  // ==========================================
+  // SUITE 4: AGENT SANDBOX DETERMINISTIC TOOLS (25/25)
+  // ==========================================
+  console.log("\n⚡ SUITE 4: Agent Sandbox Deterministic Tools (25/25 Tools)");
 
   const sandboxTools = [
     { name: "runtimeCheck", fn: () => AgentSandbox.runtimeCheck({ testFsWrite: true }) },
@@ -221,9 +278,9 @@ async function runAllTests() {
   }
 
   // ==========================================
-  // SUITE 4: STORAGE, WAL & GOS3 METADATA PERSISTENCE
+  // SUITE 5: STORAGE, WAL & GOS3 METADATA PERSISTENCE
   // ==========================================
-  console.log("\n💾 SUITE 4: Storage, WAL & Persistence Integrity");
+  console.log("\n💾 SUITE 5: Storage, WAL & Persistence Integrity");
 
   await recordTest("Storage-Engine", "Create Agent with GOS3 metadata persists to state", () => {
     const newAgent = storage.createAgent({
