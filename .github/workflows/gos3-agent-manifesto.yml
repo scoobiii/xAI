@@ -1,0 +1,28 @@
+name: gos3-agent-manifesto
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  manifesto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate manifesto contract
+        run: npm run test:gos3:manifesto
+      - name: Validate tooling onboarding contract
+        run: test -f docs/AGENT-TOOLING-POLICY.md && test -f scripts/gos3_agent_tooling_check.sh
+      - name: Fail if a fake readiness claim is introduced
+        run: |
+          if grep -RInE 'TOOLING_READY.*(true|yes)|executed[=: ]+true' scripts/gos3_agent_proof.sh docs/GOS3-AGENT-MANIFESTO.md; then
+            echo 'Refusing declarative/fake readiness claims.'
+            exit 1
+          fi
