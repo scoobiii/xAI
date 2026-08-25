@@ -13,6 +13,7 @@
     "test:vitest": "vitest run",
     "test:gos3": "bash tests/gos3_traceability_cli.test.sh",
     "gos3:audit": "bash scripts/gos3_traceability_cli.sh",
+    "gos3:sync": "bash scripts/gos3_git_sync.sh",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
