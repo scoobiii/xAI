@@ -1,126 +1,154 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# GOS3 Vortex sync gate.
-# Automates: preserve -> fetch -> switch -> fetch -> rebase -> verify -> restore.
-# Safe by default: NEVER pushes and NEVER force-pushes.
-# Usage: bash scripts/gos3_git_sync.sh <branch> [--push]
+# GOS3 Vortex Git concurrency gate.
+# Default mode NEVER touches the caller's working tree: it uses a dedicated git worktree.
+# Protocol: fetch -> isolate -> fetch -> rebase remote -> rebase main -> verify -> CAS fetch -> publish.
+# Never force-push. Never push main. Never auto-pop stash. Conflicts fail closed.
+# Usage: bash scripts/gos3_git_sync.sh <feature-branch> [--agent ID] [--push]
 
 REMOTE="${GOS3_GIT_REMOTE:-origin}"
 BRANCH="${1:-${GOS3_GIT_BRANCH:-}}"
+AGENT="${GOS3_AGENT_ID:-${GOS3_AGENT:-}}"
 DO_PUSH=0
+MAX_ATTEMPTS="${GOS3_SYNC_MAX_ATTEMPTS:-3}"
 
-if [[ "${2:-}" == "--push" ]]; then DO_PUSH=1; fi
-if [[ -z "$BRANCH" ]]; then
-  echo "[GOS3][FAIL] target branch required (example: feat/gos3-traceability-cli)" >&2
-  exit 2
-fi
-if [[ "$BRANCH" == "main" && "$DO_PUSH" == "1" ]]; then
-  echo "[GOS3][FAIL] direct main publication is disabled by this gate; use the approved PR flow" >&2
-  exit 2
-fi
+shift || true
+while (($#)); do
+  case "$1" in
+    --push) DO_PUSH=1 ;;
+    --agent) shift; AGENT="${1:-}" ;;
+    --agent=*) AGENT="${1#*=}" ;;
+    *) echo "[GOS3][FAIL] unknown argument: $1" >&2; exit 2 ;;
+  esac
+  shift || true
+done
+
+[[ -n "$BRANCH" ]] || { echo '[GOS3][FAIL] target feature branch required' >&2; exit 2; }
+[[ "$BRANCH" != "main" ]] || { echo '[GOS3][FAIL] main is never a GOS3 agent work branch' >&2; exit 2; }
+[[ -n "$AGENT" ]] || { echo '[GOS3][FAIL] GOS3_AGENT_ID required; new agents must onboard first' >&2; exit 2; }
+[[ "$AGENT" =~ ^[A-Za-z0-9._-]+$ ]] || { echo '[GOS3][FAIL] invalid agent id' >&2; exit 2; }
+[[ "$MAX_ATTEMPTS" =~ ^[1-9][0-9]*$ ]] || { echo '[GOS3][FAIL] GOS3_SYNC_MAX_ATTEMPTS must be a positive integer' >&2; exit 2; }
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 [[ -n "$ROOT" ]] || { echo '[GOS3][FAIL] not a git repository' >&2; exit 1; }
 cd "$ROOT"
 
-CURRENT="$(git branch --show-current)"
-STASHED=0
-STASH_NAME="GOS3 pre-sync: ${CURRENT:-detached} -> ${BRANCH}"
+say(){ printf '[GOS3] %s\n' "$*"; }
+ok(){ printf '[GOS3][OK] %s\n' "$*"; }
+bad(){ printf '[GOS3][FAIL] %s\n' "$*" >&2; }
 
-fail_restore=0
-restore_work() {
-  if (( STASHED == 1 )); then
-    echo "[GOS3] restoring preserved work..."
-    if git stash pop; then
-      echo "[GOS3][OK] preserved work restored"
-    else
-      echo "[GOS3][FAIL] restore conflict; stash retained for manual recovery" >&2
-      fail_restore=1
-    fi
-  fi
-}
-trap restore_work EXIT
+OP_ID="gos3-$(date -u +%Y%m%dT%H%M%SZ)-${RANDOM}${RANDOM}"
+say "operation=$OP_ID agent=$AGENT branch=$BRANCH"
+say "caller_worktree=$(git rev-parse --show-toplevel)"
 
-is_dirty() {
-  ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]
-}
+# Never use stash as the concurrency mechanism. A linked worktree isolates the agent.
+WT_ROOT="${GOS3_WORKTREE_ROOT:-$ROOT/.gos3-worktrees}"
+BRANCH_SLUG="${BRANCH//\//__}"
+WORKTREE="$WT_ROOT/$AGENT/$BRANCH_SLUG"
+mkdir -p "$(dirname "$WORKTREE")"
 
-if is_dirty; then
-  echo "[GOS3] preserving dirty/untracked work"
-  git stash push -u -m "$STASH_NAME"
-  STASHED=1
-  echo "[GOS3][OK] preserved as: $(git stash list -1 --format='%gd %s')"
+# If this branch is already checked out, fail closed instead of using --force.
+existing="$(git worktree list --porcelain | awk -v b="refs/heads/$BRANCH" '
+  $1=="worktree" {p=$2}
+  $1=="branch" && $2==b {print p}
+')"
+if [[ -n "$existing" && "$existing" != "$WORKTREE" ]]; then
+  bad "branch already owned by another worktree: $existing"
+  bad "do not use git switch --ignore-other-worktrees or git worktree add --force"
+  exit 73
 fi
 
-# Always resolve the remote target before switching. Never guess a local branch state.
-echo "[GOS3] fetch remote branch: $REMOTE/$BRANCH"
-git fetch "$REMOTE" "$BRANCH"
+say "fetch remote branch before isolation"
+git fetch --prune "$REMOTE" "$BRANCH"
+git show-ref --verify --quiet "refs/remotes/$REMOTE/$BRANCH" || { bad "remote branch not found: $REMOTE/$BRANCH"; exit 4; }
 
-git show-ref --verify --quiet "refs/remotes/$REMOTE/$BRANCH" || {
-  echo "[GOS3][FAIL] remote branch not found: $REMOTE/$BRANCH" >&2
-  exit 4
-}
-
-if [[ "$CURRENT" != "$BRANCH" ]]; then
-  echo "[GOS3] switch: ${CURRENT:-detached} -> $BRANCH"
+if [[ ! -d "$WORKTREE/.git" && ! -f "$WORKTREE/.git" ]]; then
+  say "create isolated worktree: $WORKTREE"
   if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
-    git switch "$BRANCH"
+    git worktree add "$WORKTREE" "$BRANCH"
   else
-    git switch --track -c "$BRANCH" "$REMOTE/$BRANCH"
+    git worktree add --track -b "$BRANCH" "$WORKTREE" "$REMOTE/$BRANCH"
   fi
 else
-  echo "[GOS3][OK] already on $BRANCH"
+  say "reuse isolated worktree: $WORKTREE"
 fi
 
-# Refetch immediately before rebase: another GOS3 session may have pushed meanwhile.
-echo "[GOS3] refetch remote branch immediately before rebase"
-git fetch "$REMOTE" "$BRANCH"
+cd "$WORKTREE"
 
-REMOTE_SHA="$(git rev-parse "$REMOTE/$BRANCH")"
-HEAD_BEFORE="$(git rev-parse HEAD)"
-echo "[GOS3] rebase $BRANCH onto $REMOTE/$BRANCH ($REMOTE_SHA)"
-git rebase "$REMOTE/$BRANCH"
-
-HEAD_AFTER="$(git rev-parse HEAD)"
-echo "[GOS3][OK] rebase complete: ${HEAD_AFTER:0:12}"
-
-# Fail closed if synchronization produced a conflict state.
-if [[ -d .git/rebase-merge || -d .git/rebase-apply ]]; then
-  echo "[GOS3][FAIL] rebase still in progress" >&2
-  exit 5
+# No stash/pop. Dirty state inside the agent worktree is a hard stop.
+if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
+  bad "agent worktree is dirty; commit the work or resolve it explicitly before sync"
+  bad "stash-pop automation is intentionally disabled"
+  exit 74
 fi
 
-# Machine verification: these are deliberately read-only checks.
-if [[ -x ./scripts/gos3_git_audit.sh ]]; then
-  GOS3_GIT_BRANCH="$BRANCH" GOS3_GIT_REMOTE="$REMOTE" ./scripts/gos3_git_audit.sh
-else
-  GOS3_GIT_BRANCH="$BRANCH" GOS3_GIT_REMOTE="$REMOTE" bash ./scripts/gos3_git_audit.sh
-fi
+for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+  say "attempt=$attempt/$MAX_ATTEMPTS"
 
-if [[ -x ./scripts/gos3_traceability_cli.sh ]]; then
-  bash ./scripts/gos3_traceability_cli.sh
-fi
+  # Fresh branch and main state immediately before integration.
+  git fetch --prune "$REMOTE" "$BRANCH"
+  git fetch --prune "$REMOTE" main
+  EXPECTED_REMOTE_SHA="$(git rev-parse "$REMOTE/$BRANCH")"
+  MAIN_SHA="$(git rev-parse "$REMOTE/main")"
+  say "expected_remote=$EXPECTED_REMOTE_SHA main=$MAIN_SHA"
 
-if [[ -f package.json ]] && grep -q '"test:gos3"' package.json; then
-  npm run test:gos3
-fi
+  # Absorb commits another session may already have published to this branch.
+  if ! git rebase "$REMOTE/$BRANCH"; then
+    bad "rebase onto remote branch conflicted; STOP. Resolve manually; no stash-pop/force-push."
+    exit 75
+  fi
 
-if [[ -f package.json ]] && grep -q '"gos3:audit"' package.json; then
-  npm run gos3:audit
-fi
+  # Bring the feature branch up to date with protected main.
+  if ! git rebase "$REMOTE/main"; then
+    bad "rebase onto origin/main conflicted; STOP. Resolve manually."
+    exit 76
+  fi
 
-echo "[GOS3] SYNC COMPLETE"
-echo "[GOS3] branch=$BRANCH"
-echo "[GOS3] before=$HEAD_BEFORE"
-echo "[GOS3] after=$HEAD_AFTER"
-echo "[GOS3] remote=$REMOTE_SHA"
-echo "[GOS3] push=$([[ $DO_PUSH == 1 ]] && echo requested || echo disabled)"
+  if [[ -d .git/rebase-merge || -d .git/rebase-apply ]]; then
+    bad "rebase still active; refusing to continue"
+    exit 77
+  fi
 
-if (( DO_PUSH == 1 )); then
-  echo "[GOS3] publishing feature branch (no force): $REMOTE/$BRANCH"
-  git push "$REMOTE" "$BRANCH"
-  echo "[GOS3][OK] publish complete"
-fi
+  # Read-only repository gates.
+  if [[ -x ./scripts/gos3_git_audit.sh ]]; then
+    GOS3_GIT_BRANCH="$BRANCH" GOS3_GIT_REMOTE="$REMOTE" ./scripts/gos3_git_audit.sh
+  elif [[ -f ./scripts/gos3_git_audit.sh ]]; then
+    GOS3_GIT_BRANCH="$BRANCH" GOS3_GIT_REMOTE="$REMOTE" bash ./scripts/gos3_git_audit.sh
+  fi
+  [[ -f package.json ]] && grep -q '"test:gos3"' package.json && npm run test:gos3
 
-exit 0
+  # CAS boundary: remote may have changed while we were rebasing/testing.
+  git fetch --prune "$REMOTE" "$BRANCH"
+  ACTUAL_REMOTE_SHA="$(git rev-parse "$REMOTE/$BRANCH")"
+  if [[ "$ACTUAL_REMOTE_SHA" != "$EXPECTED_REMOTE_SHA" ]]; then
+    bad "remote branch changed during operation: expected=$EXPECTED_REMOTE_SHA actual=$ACTUAL_REMOTE_SHA"
+    if (( attempt < MAX_ATTEMPTS )); then
+      say "retrying from the new remote state; previous worktree remains isolated"
+      continue
+    fi
+    bad "CAS retry budget exhausted; publication aborted"
+    exit 78
+  fi
+
+  HEAD_SHA="$(git rev-parse HEAD)"
+  say "evidence operation=$OP_ID agent=$AGENT branch=$BRANCH head=$HEAD_SHA remote=$ACTUAL_REMOTE_SHA main=$MAIN_SHA"
+  ok "GOS3 Git concurrency verification passed"
+
+  if (( DO_PUSH == 1 )); then
+    say "publishing feature branch without force"
+    if ! git push "$REMOTE" "HEAD:refs/heads/$BRANCH"; then
+      bad "publish rejected; remote changed or branch protection blocked it"
+      exit 79
+    fi
+    ok "publish complete branch=$BRANCH head=$(git rev-parse HEAD)"
+  else
+    say "publish disabled (dry synchronization)"
+  fi
+
+  printf '%s\n' "[GOS3] SYNC COMPLETE" "[GOS3] operation=$OP_ID" "[GOS3] agent=$AGENT" "[GOS3] worktree=$WORKTREE" "[GOS3] branch=$BRANCH" "[GOS3] head=$HEAD_SHA" "[GOS3] remote=$ACTUAL_REMOTE_SHA" "[GOS3] main=$MAIN_SHA" "[GOS3] push=$([[ $DO_PUSH == 1 ]] && echo published || echo disabled)"
+  exit 0
+done
+
+bad "unreachable sync state"
+exit 80
