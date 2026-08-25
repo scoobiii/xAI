@@ -17,20 +17,17 @@ if [[ "$AGENT" == --agent=* ]]; then AGENT="${AGENT#*=}"; fi
   exit 2
 }
 
-for f in docs/GIT-POLICY.md docs/AGENT-TOOLING-POLICY.md scripts/gos3_git_sync.sh scripts/gos3_agent_tooling_check.sh .githooks/pre-push; do
+for f in docs/GIT-POLICY.md docs/AGENT-TOOLING-POLICY.md scripts/gos3_git_sync.sh scripts/gos3_git_admit.sh scripts/gos3_agent_tooling_check.sh .githooks/pre-push; do
   [[ -f "$f" ]] || { echo "[GOS3][FAIL] missing required protocol file: $f" >&2; exit 3; }
 done
 
-# Contents API may materialize new shell files as non-executable. Fix that locally
-# before installing the hook; this is idempotent and does not touch application code.
-chmod +x .githooks/pre-push scripts/gos3_onboard.sh scripts/gos3_git_sync.sh scripts/gos3_agent_tooling_check.sh 2>/dev/null || true
+chmod +x .githooks/pre-push scripts/gos3_onboard.sh scripts/gos3_git_sync.sh scripts/gos3_git_admit.sh scripts/gos3_agent_tooling_check.sh 2>/dev/null || true
 
 git config --local gos3.agentId "$AGENT"
 git config --local core.hooksPath .githooks
 
 export GOS3_AGENT_ID="$AGENT"
 
-# Run the read-only onboarding contract after installing local defense-in-depth.
 ./scripts/gos3_agent_tooling_check.sh
 
 printf '%s\n' \
@@ -39,4 +36,6 @@ printf '%s\n' \
   '[GOS3][OK] core.hooksPath=.githooks' \
   '[GOS3][OK] publication requires isolated GOS3 worktree' \
   '[GOS3][OK] direct main/force/non-fast-forward publication is denied' \
-  '[GOS3][OK] next step: npm run gos3:sync -- <feature-branch>'
+  '[GOS3][OK] consuming another agent requires gos3:admit before integration' \
+  '[GOS3][OK] next step: npm run gos3:sync -- <feature-branch>' \
+  '[GOS3][OK] admission: npm run gos3:admit -- <source-branch> --agent <id>'
