@@ -13,16 +13,17 @@
     "test:vitest": "vitest run",
     "test:gos3": "bash tests/gos3_traceability_cli.test.sh",
     "test:gos3:concurrency": "bash tests/gos3_git_concurrency.test.sh",
+    "test:gos3:manifesto": "bash tests/gos3_agent_manifesto.test.sh",
     "gos3:audit": "bash scripts/gos3_traceability_cli.sh",
     "gos3:onboard": "bash scripts/gos3_onboard.sh",
     "gos3:onboard:check": "bash scripts/gos3_agent_tooling_check.sh",
+    "gos3:agent:proof": "bash scripts/gos3_agent_proof.sh",
     "gos3:sync": "bash scripts/gos3_git_sync.sh",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.1.14",
-    "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase": "^12.18.0",
@@ -37,6 +38,8 @@
     "@testing-library/react": "^16.3.2",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "^4.1.11",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
@@ -44,6 +47,7 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
+    "vite": "^6.2.3",
     "vitest": "^4.1.11"
   }
 }
