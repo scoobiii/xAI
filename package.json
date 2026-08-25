@@ -14,7 +14,8 @@
     "test:gos3": "bash tests/gos3_traceability_cli.test.sh",
     "test:gos3:concurrency": "bash tests/gos3_git_concurrency.test.sh",
     "gos3:audit": "bash scripts/gos3_traceability_cli.sh",
-    "gos3:onboard": "bash scripts/gos3_agent_tooling_check.sh",
+    "gos3:onboard": "bash scripts/gos3_onboard.sh",
+    "gos3:onboard:check": "bash scripts/gos3_agent_tooling_check.sh",
     "gos3:sync": "bash scripts/gos3_git_sync.sh",
     "lint": "tsc --noEmit"
   },
