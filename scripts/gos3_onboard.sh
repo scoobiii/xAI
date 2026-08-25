@@ -21,6 +21,10 @@ for f in docs/GIT-POLICY.md docs/AGENT-TOOLING-POLICY.md scripts/gos3_git_sync.s
   [[ -f "$f" ]] || { echo "[GOS3][FAIL] missing required protocol file: $f" >&2; exit 3; }
 done
 
+# Contents API may materialize new shell files as non-executable. Fix that locally
+# before installing the hook; this is idempotent and does not touch application code.
+chmod +x .githooks/pre-push scripts/gos3_onboard.sh scripts/gos3_git_sync.sh scripts/gos3_agent_tooling_check.sh 2>/dev/null || true
+
 git config --local gos3.agentId "$AGENT"
 git config --local core.hooksPath .githooks
 
