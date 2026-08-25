@@ -11,6 +11,8 @@
     "clean": "rm -rf dist server.cjs",
     "test": "vitest run && tsx tests/gos3_full_coverage.test.ts",
     "test:vitest": "vitest run",
+    "test:gos3": "bash tests/gos3_traceability_cli.test.sh",
+    "gos3:audit": "bash scripts/gos3_traceability_cli.sh",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
