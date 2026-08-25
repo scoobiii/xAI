@@ -14,11 +14,17 @@ HOOK="$ROOT/.githooks/pre-push"
 [[ -f "$BOOTSTRAP" ]] || { echo 'FAIL: mandatory onboarding bootstrap missing'; exit 1; }
 [[ -f "$HOOK" ]] || { echo 'FAIL: pre-push safety hook missing'; exit 1; }
 
-# Static safety contract: dangerous recovery/publication paths must not exist.
-if grep -Eq 'git push .*--force|git push -f|--ignore-other-worktrees|worktree add --force' "$SYNC" "$HOOK"; then
-  echo 'FAIL: unsafe force/override Git operation found'
-  exit 1
-fi
+# Static safety contract: inspect executable shell lines only.
+# The implementation intentionally documents forbidden operations (for example
+# --ignore-other-worktrees and --force) in comments. A raw grep over the whole
+# file would therefore reject the policy text itself and create a false positive.
+for file in "$SYNC" "$HOOK"; do
+  executable_lines="$(grep -Ev '^[[:space:]]*#' "$file" || true)"
+  if printf '%s\n' "$executable_lines" | grep -Eq '(^|[;&|][[:space:]]*)git[[:space:]]+push([[:space:]]|$).*--force|(^|[;&|][[:space:]]*)git[[:space:]]+push([[:space:]]|$).*(^|[[:space:]])-f([[:space:]]|$)|(^|[;&|][[:space:]]*)git[[:space:]]+push([[:space:]]|$).*\+[^[:space:]]|(^|[;&|][[:space:]]*)git[[:space:]]+worktree[[:space:]]+add([[:space:]]|$).*--force|(^|[;&|][[:space:]]*)git[[:space:]]+switch([[:space:]]|$).*--ignore-other-worktrees'; then
+    echo "FAIL: unsafe force/override Git operation found in executable code: $file"
+    exit 1
+  fi
+done
 
 for needle in \
   'GOS3_AGENT_ID' \
