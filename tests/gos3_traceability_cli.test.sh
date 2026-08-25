@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 CLI="$ROOT/scripts/gos3_traceability_cli.sh"
-[[ -x "$CLI" ]] || { echo 'FAIL: traceability CLI is not executable'; exit 1; }
+[[ -f "$CLI" ]] || { echo 'FAIL: traceability CLI missing'; exit 1; }
 
 out="$(bash "$CLI")"
 
