@@ -5,13 +5,17 @@ ROOT="$(git rev-parse --show-toplevel)"
 SYNC="$ROOT/scripts/gos3_git_sync.sh"
 POLICY="$ROOT/docs/GIT-POLICY.md"
 ONBOARD="$ROOT/scripts/gos3_agent_tooling_check.sh"
+BOOTSTRAP="$ROOT/scripts/gos3_onboard.sh"
+HOOK="$ROOT/.githooks/pre-push"
 
 [[ -f "$SYNC" ]] || { echo 'FAIL: concurrency gate missing'; exit 1; }
 [[ -f "$POLICY" ]] || { echo 'FAIL: concurrency policy missing'; exit 1; }
 [[ -f "$ONBOARD" ]] || { echo 'FAIL: onboarding check missing'; exit 1; }
+[[ -f "$BOOTSTRAP" ]] || { echo 'FAIL: mandatory onboarding bootstrap missing'; exit 1; }
+[[ -f "$HOOK" ]] || { echo 'FAIL: pre-push safety hook missing'; exit 1; }
 
 # Static safety contract: dangerous recovery/publication paths must not exist.
-if grep -Eq 'git push .*--force|git push -f|--ignore-other-worktrees|worktree add --force' "$SYNC"; then
+if grep -Eq 'git push .*--force|git push -f|--ignore-other-worktrees|worktree add --force' "$SYNC" "$HOOK"; then
   echo 'FAIL: unsafe force/override Git operation found'
   exit 1
 fi
@@ -25,14 +29,15 @@ for needle in \
   'rebase' \
   'retry' \
   'stash-pop automation is intentionally disabled' \
-  'Direct --push main' ; do
-  # Last item is represented semantically in the script; handle separately below.
-  if [[ "$needle" == 'Direct --push main' ]]; then continue; fi
+  'BRANCH" != "main"'; do
   grep -Fq "$needle" "$SYNC" || { echo "FAIL: missing concurrency invariant: $needle"; exit 1; }
 done
 
-grep -Fq 'BRANCH" != "main"' "$SYNC" || { echo 'FAIL: main safety guard missing'; exit 1; }
-grep -Fq 'branch already owned by another worktree' "$SYNC" || { echo 'FAIL: worktree ownership guard missing'; exit 1; }
+grep -Fq 'remote branch moved; refusing non-fast-forward publication' "$HOOK" || { echo 'FAIL: non-fast-forward guard missing'; exit 1; }
+grep -Fq 'push to main is prohibited' "$HOOK" || { echo 'FAIL: main push guard missing'; exit 1; }
+grep -Fq 'isolated worktree' "$HOOK" || { echo 'FAIL: isolated worktree publication guard missing'; exit 1; }
+grep -Fq 'core.hooksPath' "$BOOTSTRAP" || { echo 'FAIL: hook installation missing'; exit 1; }
+grep -Fq 'gos3.agentId' "$BOOTSTRAP" || { echo 'FAIL: persistent agent identity missing'; exit 1; }
 grep -Fq 'GOS3_AGENT_ID' "$ONBOARD" || { echo 'FAIL: onboarding identity gate missing'; exit 1; }
 grep -Fq 'gos3:sync' "$ONBOARD" || { echo 'FAIL: onboarding sync gate missing'; exit 1; }
 grep -Fq 'CAS' "$POLICY" || { echo 'FAIL: CAS policy missing'; exit 1; }
