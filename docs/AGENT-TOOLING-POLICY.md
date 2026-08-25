@@ -9,17 +9,17 @@ Every agent must be able to use the repository's Git safety protocol, GitHub API
 
 ## 2. Mandatory Git concurrency onboarding
 
-Before touching project Git state, a new agent MUST:
-
-1. Read `docs/GIT-POLICY.md`.
-2. Run `./scripts/gos3_agent_tooling_check.sh`.
-3. Set a unique `GOS3_AGENT_ID`.
-4. Use the repository-local sync gate for routine synchronization.
-
-Example:
+Before touching project Git state, a new agent MUST bootstrap the local defenses. This is executable policy, not a README suggestion:
 
 ```bash
-export GOS3_AGENT_ID=gpt-<unique-session-id>
+npm run gos3:onboard -- --agent <unique-agent-id>
+```
+
+The bootstrap installs the repository-local `.githooks` path, persists the agent identity locally, makes the safety scripts executable, and runs the read-only onboarding contract. It is safe to repeat.
+
+The resulting routine synchronization command is:
+
+```bash
 npm run gos3:sync -- feat/<task-branch>
 ```
 
@@ -49,6 +49,8 @@ Rebase conflicts, dirty worktrees, ambiguous ownership, and rejected publication
 
 No agent may publish directly to `main`. Feature branches go through the approved PR flow and required branch protection/CI/review. Normal pushes only; never force-push protected history.
 
+Defense in depth: after onboarding, the repository-local `pre-push` hook rejects direct main pushes, branch deletion, non-fast-forward publication, and pushes originating outside a GOS3 isolated worktree. GitHub branch protection remains authoritative.
+
 ## 7. Evidence discipline
 
 Every sync/publish operation must emit an operation ID and agent ID plus branch, worktree, head SHA, expected/actual remote SHA, main SHA, and publication state. Evidence must contain no credentials.
@@ -60,13 +62,12 @@ The roster is dynamic. A provider/model/person is not exempt because it was prev
 Required proof:
 
 ```bash
-./scripts/gos3_agent_tooling_check.sh
+npm run gos3:onboard -- --agent <unique-agent-id>
 ```
 
 Then:
 
 ```bash
-export GOS3_AGENT_ID=<unique-id>
 npm run gos3:sync -- feat/<task>
 ```
 
