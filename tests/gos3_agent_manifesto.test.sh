@@ -11,6 +11,7 @@ ok(){ echo "PASS: $*"; }
 [[ -f scripts/gos3_git_admit.sh ]] || fail 'admission gate missing'
 [[ -f tests/gos3_git_admit.test.sh ]] || fail 'admission contract test missing'
 [[ -f tests/gos3_agent_runtime.test.ts ]] || fail 'behavioral runtime test missing'
+[[ -f tests/gos3_connector_claims.test.sh ]] || fail 'connector anti-fabrication contract missing'
 [[ -f src/server/sandbox.ts ]] || fail 'sandbox implementation missing'
 
 grep -q 'No proof → no capability → no consequential action' docs/GOS3-AGENT-MANIFESTO.md || fail 'fail-closed rule missing'
@@ -18,6 +19,7 @@ grep -q 'executeJavaScript' docs/GOS3-AGENT-MANIFESTO.md || fail 'JS proof requi
 grep -q 'executePythonSim' docs/GOS3-AGENT-MANIFESTO.md || fail 'Python proof requirement missing'
 grep -q 'calculateEnergyBESS' docs/GOS3-AGENT-MANIFESTO.md || fail 'tool proof requirement missing'
 grep -q 'Vercel Sandbox provider' docs/GOS3-AGENT-MANIFESTO.md || fail 'Vercel provider requirement missing'
+grep -q 'connector' docs/GOS3-AGENT-MANIFESTO.md || fail 'connector proof requirement missing'
 grep -q 'git rebase origin/<target-branch>' docs/GOS3-AGENT-MANIFESTO.md || fail 'Git concurrency protocol missing'
 grep -q 'GOS3_EXECUTION_ID' scripts/gos3_agent_proof.sh || fail 'execution receipt gate missing'
 grep -q 'GOS3_EVIDENCE_ID' scripts/gos3_agent_proof.sh || fail 'evidence receipt gate missing'
