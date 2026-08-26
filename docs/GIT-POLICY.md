@@ -1,13 +1,13 @@
-> **GOS3** · agente: `grok` · papel: `Auditor / Protocolo Git`
-> fase: `fase 5 — padronização e governança` · data: `2026-08-26` · hora: `02:31:36 UTC`
-> antes: Policy de concorrência sem cabeçalho GOS3 e sem bloco explícito New agents
-> depois: Cabeçalho GOS3 + New agents obrigatório (admission, CAS, worktree, sem force-push)
-> base: scripts/gos3_git_sync.sh, scripts/gos3_git_admit.sh, .githooks/pre-push
-> assinatura: `Grok · Auditor · GOS3`
+> **GOS3** · agente: `gpt` · papel: `Auditor / Connector Safety`
+> fase: `hardening — anti-fabrication connector gate` · data: `2026-08-25`
+> antes: catálogo podia declarar `isConnected=true` sem prova comportamental do host
+> depois: claims de connector exigem prova host-owned; catálogo sem prova é apenas catálogo
+> base: tests/gos3_connector_claims.test.sh, docs/GOS3-AGENT-MANIFESTO.md
+> assinatura: `GPT · Auditor · GOS3`
 
 # GOS3 Git Concurrency Policy — Single Source of Truth
 
-**Status:** REQUIRED
+**Status:** REQUIRED  
 **Scope:** every human and agent session working on this repository
 
 ## 1. Concurrency is a protocol, not a convention
@@ -95,6 +95,7 @@ New agents:
 - MUST pass GOS3 admission before pull/rebase/push/publication when consuming another agent's work (`npm run gos3:admit -- <source-branch> --agent <id>`).
 - MUST prove Git concurrency capability (`gos3:sync` / concurrency contract).
 - MUST prove sandbox runtime + agent tools capability (`gos3:agent:proof` / agent-runtime gate).
+- MUST prove every assigned external connector behaviorally; a catalog flag is never proof.
 - MUST have a GOS3 agent identity (`GOS3_AGENT_ID` / `gos3.agentId`).
 - MUST use isolated worktrees for publication.
 - MUST fail closed on remote CAS mismatch.
@@ -104,6 +105,7 @@ Every new GOS3/Vortex agent MUST read this policy and `docs/AGENT-TOOLING-POLICY
 
 ```bash
 ./scripts/gos3_agent_tooling_check.sh
+npm run gos3:connector-claims
 ```
 
 The agent must then identify itself and use the sync gate:
@@ -115,7 +117,24 @@ npm run gos3:sync -- <feature-branch>
 
 Agents MUST NOT invent an alternate Git synchronization sequence for routine work.
 
-## 8. Failure matrix
+## 8. Connector anti-fabrication
+
+Connector metadata is not a capability receipt. The following are **not proof**:
+
+- `isConnected: true` in a static catalog;
+- hardcoded account email or `connectedAt` timestamp;
+- provider/model name;
+- environment variable presence by itself;
+- README, screenshot, agent narrative, or another agent's assertion;
+- mocked tool output.
+
+A connector is `READY` only after the host-owned connector performs the harmless operation required by its role and returns an execution/evidence receipt. Missing credentials, missing provider CLI, missing connector host, or failed execution MUST produce `BLOCKED`, `AUTH_REQUIRED`, or `NOT_EXECUTED` — never `READY`.
+
+The repository gate `npm run gos3:connector-claims` checks for known fabricated connector surfaces and hardcoded connection claims. It is intentionally fail-closed: if a later implementation introduces a real connector, it must also add a behavioral test and evidence contract before marking it operational.
+
+Known unverified claims currently include the previously reported TypeScript `mcpService.ts` and GCloud tool surface. The repository contains a Python `mcp_server.py`, but its own header marks the implementation as proposed/not executed; it must not be promoted to an operational claim without runtime evidence.
+
+## 9. Failure matrix
 
 | Event | Required action |
 |---|---|
@@ -125,8 +144,9 @@ Agents MUST NOT invent an alternate Git synchronization sequence for routine wor
 | remote changed during operation | bounded retry from new SHA |
 | push non-fast-forward | STOP/re-sync; never force |
 | main publication requested | DENY; use PR |
+| unverified connector claim | BLOCK; require host behavioral proof |
 | ambiguous state | STOP and emit evidence |
 
-## 9. Rationale
+## 10. Rationale
 
-The repository has repeatedly experienced race conditions caused by multiple agents sharing a worktree, stale remote state, blind stash restoration, and concurrent pushes. This protocol converts those failures into explicit synchronization states with isolation, CAS verification, bounded retries, and fail-closed behavior.
+The repository has repeatedly experienced race conditions caused by multiple agents sharing a worktree, stale remote state, blind stash restoration, concurrent pushes, and narrative claims about tools/connectors that were not present in the runtime. This protocol converts those failures into explicit synchronization and capability states with isolation, CAS verification, behavioral evidence, bounded retries, and fail-closed behavior.
