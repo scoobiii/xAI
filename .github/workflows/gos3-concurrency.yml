@@ -1,0 +1,27 @@
+name: gos3-audit
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, 'feat/**']
+
+jobs:
+  gos3-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: GOS3 onboarding/concurrency contract
+        env:
+          GOS3_AGENT_ID: ci-gos3
+        run: |
+          npm run gos3:onboard
+          npm run test:gos3
+          npm run test:gos3:concurrency
+      - name: GOS3 traceability audit
+        run: npm run gos3:audit

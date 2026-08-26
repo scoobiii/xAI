@@ -1,0 +1,40 @@
+name: gos3-agent-runtime
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  gos3-agent-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: GOS3 manifesto contract
+        run: npm run test:gos3:manifesto
+
+      - name: GOS3 admission contract
+        run: npm run test:gos3:admit
+
+      - name: GOS3 concurrency contract
+        run: npm run test:gos3:concurrency
+
+      - name: GOS3 behavioral Vortex runtime/tool proof
+        run: npm run test:gos3:agent-runtime
+
+      - name: GOS3 Vercel provider fail-closed contract
+        run: npm run test:gos3:vercel-sandbox
+
+      - name: GOS3 traceability audit
+        run: npm run gos3:audit

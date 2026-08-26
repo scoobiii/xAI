@@ -1,130 +1,100 @@
-# GOS3 Agent Tooling Policy — 18 Friends
+> **GOS3** · agente: `grok` · papel: `Auditor / Tooling & Onboarding`
+> fase: `fase 5 — padronização e governança` · data: `2026-08-26` · hora: `02:31:36 UTC`
+> antes: Política de tooling sem cabeçalho GOS3
+> depois: Cabeçalho GOS3; onboarding + sync + prova de runtime obrigatórios
+> base: npm run gos3:onboard, gos3:sync, gos3:agent:proof
+> assinatura: `Grok · Auditor · GOS3`
+
+# GOS3 Agent Tooling & Onboarding Policy — Vortex
 
 **Status:** REQUIRED
-**Scope:** every GOS3 agent/session participating in xAI/Vortex work
+**Scope:** every current and future GOS3/Vortex agent/session
 
-## Objective
+## 1. Capability contract
 
-Every GOS3 friend must be operationally capable of:
+Every agent must be able to use the repository's Git safety protocol, GitHub API/connector, required MCP capabilities, and Google Cloud capability when assigned Cloud work. Credentials are per-agent and must never be copied or committed.
 
-1. Git locally (`git fetch`, `rebase`, `status`, `diff`, `commit`, `push`, conflict recovery).
-2. GitHub API access through an authenticated GitHub identity or approved GitHub connector.
-3. GitHub MCP Server / GitHub MCP connector, including tool discovery and safe invocation.
-4. The project's MCP Server connector, including discovery, invocation, result/evidence handling, and failure reporting.
-5. Google Cloud through the `gcloud` connector/CLI, authenticated as that friend's own Google/Gmail identity when user credentials are appropriate.
-
-This is a **capability contract**, not a shared credential contract.
-
-## Identity and credential rule
-
-Each friend uses their own authorized GitHub identity and their own Google identity. Credentials, OAuth tokens, PATs, ADC files, cookies, service-account keys, and refresh tokens MUST NOT be copied between friends or committed to the repository.
-
-For local Google development, `gcloud auth login` authenticates the gcloud CLI and `gcloud auth application-default login` configures Application Default Credentials. These are distinct credential stores and may use the same Google account. Production workloads should prefer an attached service account / workload identity with least privilege rather than exported user credentials.
-
-## Required Git capability
-
-Before publishing any change, the friend must know and follow `docs/GIT-POLICY.md` and use the repository publish gate when available.
-
-Minimum practical proof:
+Runtime capability is also mandatory. An agent must prove the sandbox/runtime and approved tool surface in the runtime assigned to its role. For the Vercel provider, the canonical provider proof is:
 
 ```bash
-git status
-git fetch origin
-git rebase origin/main
-git log --oneline -5
+npm run gos3:vercel:sandbox -- <unique-agent-id>
 ```
 
-A non-fast-forward push is never solved with `git push --force` on `main`.
+This proof is fail-closed: missing Sandbox CLI or missing host authentication is a BLOCK, not a simulated success. The provider probe must emit execution/evidence IDs derived from the actual sandbox command result.
 
-## Required GitHub API capability
+## 2. Mandatory Git concurrency onboarding
 
-The friend must be able to authenticate and perform a harmless read against the repository using either GitHub CLI/API or the approved GitHub connector.
-
-Examples:
+Before touching project Git state, a new agent MUST bootstrap the local defenses. This is executable policy, not a README suggestion:
 
 ```bash
-gh auth status
-gh api repos/scoobiii/xAI --jq '.full_name'
+npm run gos3:onboard -- --agent <unique-agent-id>
 ```
 
-Never print or paste access tokens into chat, issues, logs, commits, or test fixtures.
+The bootstrap installs the repository-local `.githooks` path, persists the agent identity locally, makes the safety scripts executable, and runs the read-only onboarding contract. It is safe to repeat.
 
-## Required GitHub MCP capability
-
-The friend must be able to:
-
-- connect/authenticate the GitHub MCP Server;
-- list/discover available tools;
-- identify the correct tool before acting;
-- perform a harmless repository read;
-- distinguish read from write operations;
-- request/obtain human approval for consequential writes where the host requires it;
-- report tool errors instead of improvising destructive Git operations.
-
-## Required project MCP Server capability
-
-The friend must be able to connect to the GOS3/xAI MCP Server connector and demonstrate:
-
-- server connection;
-- tool discovery;
-- one read-only invocation;
-- one controlled execution path when authorized;
-- capture of result/evidence metadata;
-- correct handling of timeout/error/denied execution.
-
-## Required Google Cloud capability
-
-When the friend is assigned Google Cloud work, they must authenticate with their own authorized Google/Gmail identity:
+The resulting routine synchronization command is:
 
 ```bash
-gcloud auth login
-gcloud auth list
-gcloud config list account project
+npm run gos3:sync -- feat/<task-branch>
 ```
 
-For local client libraries requiring ADC:
+The agent must NOT replace this with ad-hoc `checkout/fetch/rebase/push` sequences.
+
+## 3. Worktree isolation
+
+Each agent/session owns a dedicated worktree. Shared branch switching inside one worktree is prohibited for multi-agent operation. The sync gate creates/reuses `.gos3-worktrees/<agent>/<branch>` and fails if the branch is already owned by another worktree.
+
+Never use:
 
 ```bash
-gcloud auth application-default login
-gcloud auth application-default print-access-token >/dev/null
+git worktree add --force ...
+git switch --ignore-other-worktrees ...
+git push --force ...
 ```
 
-The Google account must have only the IAM permissions required for the assigned task. A Gmail address is an identity; it does not by itself grant access to a Cloud project.
+## 4. Concurrency/CAS requirement
 
-## Connector capability matrix
+The sync gate captures the remote feature SHA, integrates remote feature and `origin/main`, runs tests, then fetches the feature branch again. Publication is permitted only if the final remote SHA equals the captured SHA. A change by another agent causes a bounded retry; exhaustion fails closed.
 
-| Capability | Required | Proof |
-|---|---:|---|
-| Git CLI | YES | status/fetch/rebase test |
-| GitHub API | YES | authenticated repository read |
-| GitHub connector | YES | connector discovery + read |
-| GitHub MCP Server | YES | tools/list + harmless read |
-| Project MCP Server connector | YES | discovery + read + evidence |
-| gcloud CLI/connector | YES when assigned | account/project identity check |
-| Gmail/Google identity | YES for Cloud work | own authorized account |
-| Shared credentials | NO | must fail audit |
-| Force push main | NO | must fail audit |
+## 5. Conflict discipline
 
-## Agent onboarding gate
+Rebase conflicts, dirty worktrees, ambiguous ownership, and rejected publication are STOP conditions. The automation does not blindly `git stash pop`. The agent must preserve its isolated worktree and resolve the conflict explicitly.
 
-A friend is **TOOLING READY** only after their environment passes the repository-local tooling audit. The audit must be run at onboarding and whenever connector/authentication configuration changes.
+## 6. Publication discipline
 
-The audit checks capability and configuration presence; it does not require or expose secrets.
+No agent may publish directly to `main`. Feature branches go through the approved PR flow and required branch protection/CI/review. Normal pushes only; never force-push protected history.
+
+Defense in depth: after onboarding, the repository-local `pre-push` hook rejects direct main pushes, branch deletion, non-fast-forward publication, and pushes originating outside a GOS3 isolated worktree. GitHub branch protection remains authoritative.
+
+## 7. Evidence discipline
+
+Every sync/publish/runtime proof operation must emit an operation/execution ID and agent ID plus branch/worktree/runtime state and evidence IDs. Evidence must contain no credentials.
+
+## 8. Onboarding gate is mandatory for new agents
+
+The roster is dynamic. A provider/model/person is not exempt because it was previously used. A newly instantiated agent is considered **NOT TOOLING READY** until onboarding passes.
+
+Required proof:
 
 ```bash
-./scripts/gos3_agent_tooling_check.sh
+npm run gos3:onboard -- --agent <unique-agent-id>
+npm run gos3:agent:proof -- <unique-agent-id>
 ```
 
-The GOS3 roster is dynamic. Do not hard-code a provider list into runtime behavior. The number "18" is the current onboarding target, not a permanent protocol constant.
+When Vercel Sandbox is the assigned runtime:
 
-## Failure policy
+```bash
+npm run gos3:vercel:sandbox -- <unique-agent-id>
+```
 
-If a friend lacks one of the required capabilities:
+Then:
 
-- mark that capability `BLOCKED`;
-- do not fake tool execution or claim authentication succeeded;
-- do not borrow another friend's credentials;
-- do not bypass the Git publish gate;
-- report the exact missing connector/tool and remediation needed.
+```bash
+npm run gos3:sync -- feat/<task>
+```
 
-The PO may authorize exceptions for a specific task, but exceptions must be explicit and must not weaken the `main` Git safety invariant.
+A host may provide GitHub/MCP/Vercel credentials or connectors, but the agent must prove the capability through host-owned tooling checks. Secrets are never requested as evidence.
+
+## 9. Failure policy
+
+If a capability is missing, mark it BLOCKED and report the exact missing capability. Do not fake execution, borrow credentials, bypass the Git gate, or force-push to recover from a race.

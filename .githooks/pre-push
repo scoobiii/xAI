@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# GOS3 Vortex publication safety hook.
+# Installed by scripts/gos3_onboard.sh via core.hooksPath.
+# Defense in depth: GitHub branch protection remains authoritative.
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[[ -n "$ROOT" ]] || { echo '[GOS3][FAIL] not a Git worktree' >&2; exit 1; }
+cd "$ROOT"
+
+agent="${GOS3_AGENT_ID:-$(git config --get gos3.agentId 2>/dev/null || true)}"
+[[ -n "$agent" && "$agent" =~ ^[A-Za-z0-9._-]+$ ]] || {
+  echo '[GOS3][FAIL] agent not onboarded: set GOS3_AGENT_ID or run npm run gos3:onboard -- --agent <id>' >&2
+  exit 73
+}
+
+branch="$(git branch --show-current 2>/dev/null || true)"
+[[ "$branch" != "main" ]] || {
+  echo '[GOS3][FAIL] direct publication from main is prohibited' >&2
+  exit 74
+}
+
+# Routine agent publication must come from the isolated worktree created by gos3_git_sync.
+case "$ROOT" in
+  */.gos3-worktrees/*) ;;
+  *)
+    echo '[GOS3][FAIL] publication must originate from a GOS3 isolated worktree' >&2
+    echo '[GOS3][FAIL] run: GOS3_AGENT_ID=<id> npm run gos3:sync -- <feature-branch> --push' >&2
+    exit 75
+    ;;
+esac
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [[ -n "$local_ref" ]] || continue
+
+  # Never delete a remote branch through this hook.
+  if [[ "$local_sha" =~ ^0+$ ]]; then
+    echo '[GOS3][FAIL] branch deletion is prohibited by the GOS3 publication gate' >&2
+    exit 76
+  fi
+
+  # Never push main, even if the caller aliases/refspecs it unexpectedly.
+  if [[ "$remote_ref" == "refs/heads/main" ]]; then
+    echo '[GOS3][FAIL] push to main is prohibited; publish through a PR' >&2
+    exit 77
+  fi
+
+  # Reject non-fast-forward publication. A remote race requires re-sync, never force.
+  if [[ ! "$remote_sha" =~ ^0+$ ]]; then
+    if ! git merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+      echo '[GOS3][FAIL] remote branch moved; refusing non-fast-forward publication' >&2
+      echo '[GOS3][FAIL] re-run GOS3 sync; never force-push' >&2
+      exit 78
+    fi
+  fi
+
+done
+
+echo "[GOS3][OK] pre-push safety gate passed (agent=$agent branch=$branch)"
