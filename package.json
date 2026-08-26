@@ -17,6 +17,7 @@
     "test:gos3:agent-runtime": "tsx tests/gos3_agent_runtime.test.ts",
     "test:gos3:admit": "bash tests/gos3_git_admit.test.sh",
     "test:gos3:vercel-sandbox": "bash tests/gos3_vercel_sandbox.test.sh",
+    "test:gos3:connector-claims": "bash tests/gos3_connector_claims.test.sh",
     "gos3:audit": "bash scripts/gos3_traceability_cli.sh",
     "gos3:onboard": "bash scripts/gos3_onboard.sh",
     "gos3:onboard:check": "bash scripts/gos3_agent_tooling_check.sh",
