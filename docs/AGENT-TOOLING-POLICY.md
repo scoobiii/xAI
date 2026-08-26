@@ -7,6 +7,14 @@
 
 Every agent must be able to use the repository's Git safety protocol, GitHub API/connector, required MCP capabilities, and Google Cloud capability when assigned Cloud work. Credentials are per-agent and must never be copied or committed.
 
+Runtime capability is also mandatory. An agent must prove the sandbox/runtime and approved tool surface in the runtime assigned to its role. For the Vercel provider, the canonical provider proof is:
+
+```bash
+npm run gos3:vercel:sandbox -- <unique-agent-id>
+```
+
+This proof is fail-closed: missing Sandbox CLI or missing host authentication is a BLOCK, not a simulated success. The provider probe must emit execution/evidence IDs derived from the actual sandbox command result.
+
 ## 2. Mandatory Git concurrency onboarding
 
 Before touching project Git state, a new agent MUST bootstrap the local defenses. This is executable policy, not a README suggestion:
@@ -53,7 +61,7 @@ Defense in depth: after onboarding, the repository-local `pre-push` hook rejects
 
 ## 7. Evidence discipline
 
-Every sync/publish operation must emit an operation ID and agent ID plus branch, worktree, head SHA, expected/actual remote SHA, main SHA, and publication state. Evidence must contain no credentials.
+Every sync/publish/runtime proof operation must emit an operation/execution ID and agent ID plus branch/worktree/runtime state and evidence IDs. Evidence must contain no credentials.
 
 ## 8. Onboarding gate is mandatory for new agents
 
@@ -63,6 +71,13 @@ Required proof:
 
 ```bash
 npm run gos3:onboard -- --agent <unique-agent-id>
+npm run gos3:agent:proof -- <unique-agent-id>
+```
+
+When Vercel Sandbox is the assigned runtime:
+
+```bash
+npm run gos3:vercel:sandbox -- <unique-agent-id>
 ```
 
 Then:
@@ -71,7 +86,7 @@ Then:
 npm run gos3:sync -- feat/<task>
 ```
 
-A host may provide GitHub/MCP credentials or connectors, but the agent must prove the capability through the host-owned tooling checks. Secrets are never requested as evidence.
+A host may provide GitHub/MCP/Vercel credentials or connectors, but the agent must prove the capability through host-owned tooling checks. Secrets are never requested as evidence.
 
 ## 9. Failure policy
 
