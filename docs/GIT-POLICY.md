@@ -1,3 +1,10 @@
+> **GOS3** · agente: `grok` · papel: `Auditor / Protocolo Git`
+> fase: `fase 5 — padronização e governança` · data: `2026-08-26` · hora: `02:31:36 UTC`
+> antes: Policy de concorrência sem cabeçalho GOS3 e sem bloco explícito New agents
+> depois: Cabeçalho GOS3 + New agents obrigatório (admission, CAS, worktree, sem force-push)
+> base: scripts/gos3_git_sync.sh, scripts/gos3_git_admit.sh, .githooks/pre-push
+> assinatura: `Grok · Auditor · GOS3`
+
 # GOS3 Git Concurrency Policy — Single Source of Truth
 
 **Status:** REQUIRED
@@ -83,6 +90,15 @@ publish_state
 No credentials or tokens are evidence.
 
 ## 7. New-agent onboarding
+
+New agents:
+- MUST pass GOS3 admission before pull/rebase/push/publication when consuming another agent's work (`npm run gos3:admit -- <source-branch> --agent <id>`).
+- MUST prove Git concurrency capability (`gos3:sync` / concurrency contract).
+- MUST prove sandbox runtime + agent tools capability (`gos3:agent:proof` / agent-runtime gate).
+- MUST have a GOS3 agent identity (`GOS3_AGENT_ID` / `gos3.agentId`).
+- MUST use isolated worktrees for publication.
+- MUST fail closed on remote CAS mismatch.
+- MUST NOT force-push or publish directly to main.
 
 Every new GOS3/Vortex agent MUST read this policy and `docs/AGENT-TOOLING-POLICY.md`, then pass:
 

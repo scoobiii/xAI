@@ -1,3 +1,10 @@
+> **GOS3** · agente: `grok` · papel: `Auditor / Manifesto de Agentes`
+> fase: `fase 5 — padronização e governança` · data: `2026-08-26` · hora: `02:31:36 UTC`
+> antes: Manifesto sem cabeçalho GOS3 de rastreio de mutação
+> depois: Cabeçalho GOS3; onboarding fail-closed com prova comportamental e connectors host-owned
+> base: scripts/gos3_agent_proof.sh, scripts/gos3_onboard.sh, docs/AGENT-TOOLING-POLICY.md
+> assinatura: `Grok · Auditor · GOS3`
+
 # GOS3 Agent Manifesto — Universal Agent Operating & Safety Protocol
 
 **Status:** REQUIRED / FAIL-CLOSED  

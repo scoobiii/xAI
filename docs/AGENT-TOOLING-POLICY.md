@@ -1,3 +1,10 @@
+> **GOS3** · agente: `grok` · papel: `Auditor / Tooling & Onboarding`
+> fase: `fase 5 — padronização e governança` · data: `2026-08-26` · hora: `02:31:36 UTC`
+> antes: Política de tooling sem cabeçalho GOS3
+> depois: Cabeçalho GOS3; onboarding + sync + prova de runtime obrigatórios
+> base: npm run gos3:onboard, gos3:sync, gos3:agent:proof
+> assinatura: `Grok · Auditor · GOS3`
+
 # GOS3 Agent Tooling & Onboarding Policy — Vortex
 
 **Status:** REQUIRED
