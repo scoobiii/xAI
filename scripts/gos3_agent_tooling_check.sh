@@ -42,9 +42,14 @@ if [[ -f package.json ]]; then
 fi
 
 # Existing policy/tooling contract.
-for f in docs/GIT-POLICY.md docs/AGENT-TOOLING-POLICY.md scripts/gos3_git_audit.sh scripts/gos3_git_publish.sh; do
+for f in docs/GIT-POLICY.md docs/AGENT-TOOLING-POLICY.md docs/GOS3-AGENT-MANIFESTO.md scripts/gos3_git_audit.sh scripts/gos3_git_publish.sh scripts/gos3_agent_proof.sh scripts/gos3_vercel_sandbox_proof.sh; do
   [[ -f "$f" ]] && ok "policy/tool present: $f" || bad "missing policy/tool: $f"
 done
+
+if [[ -f package.json ]]; then
+  grep -q '"gos3:agent:proof"' package.json && ok 'npm gos3:agent:proof command exposed' || bad 'npm gos3:agent:proof command missing'
+  grep -q '"gos3:vercel:sandbox"' package.json && ok 'npm gos3:vercel:sandbox command exposed' || bad 'npm gos3:vercel:sandbox command missing'
+fi
 
 if [[ -d .git ]]; then
   ok "Git repository: $(git rev-parse --show-toplevel)"
@@ -58,6 +63,18 @@ if have gcloud; then
   ok "gcloud CLI: $(gcloud --version 2>/dev/null | head -1)"
 else
   warn 'gcloud not installed; required only for agents assigned Cloud work'
+fi
+
+# Vercel Sandbox is conditional on role assignment. If a Vercel runtime is assigned,
+# its proof must be performed by the provider gate; this preflight never fakes it.
+if [[ "${GOS3_RUNTIME_PROVIDER:-}" == "vercel-sandbox" ]]; then
+  if have sandbox; then
+    ok 'Vercel Sandbox CLI available'
+  else
+    bad 'Vercel Sandbox runtime assigned but CLI unavailable'
+  fi
+else
+  warn 'Vercel Sandbox provider not assigned in this host; run gos3:vercel:sandbox when assigned'
 fi
 
 printf '%s\n' '------------------------------------------------------------'
