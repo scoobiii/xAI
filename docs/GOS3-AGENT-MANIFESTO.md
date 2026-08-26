@@ -2,7 +2,7 @@
 
 **Status:** REQUIRED / FAIL-CLOSED  
 **Scope:** every new and existing agent operating through Vortex/GOS3/xAI  
-**Version:** 1.0
+**Version:** 1.1
 
 ## 1. Core rule
 
@@ -26,6 +26,7 @@ Every agent onboarding MUST produce a capability receipt containing:
 | Sandbox JavaScript runtime | YES | execute harmless JS and receive success + evidence hash |
 | Sandbox Python/simulation runtime | YES | execute harmless Python/sim program and receive success + evidence hash |
 | Runtime tool invocation | YES | invoke an approved deterministic tool and receive evidence |
+| Vercel Sandbox provider | when assigned | real `sandbox run` execution + execution/evidence IDs |
 | Tool discovery / MCP | YES when assigned | tools/list + harmless read, owned by host connector |
 | Git | YES | status + fetch + second fetch + rebase protocol |
 | GitHub connector/API | YES for GitHub work | authenticated harmless repository read |
@@ -58,23 +59,26 @@ The proof must originate from the actual runtime/tool invocation and include an 
 
 Vortex is the execution/runtime layer for GOS3 agents. The xAI repository must keep this manifesto and its onboarding gate synchronized with the runtime implementation.
 
-The canonical local proof command is:
+Canonical local proof commands:
 
 ```bash
 npm run gos3:agent:proof -- <agent-id>
+npm run gos3:vercel:sandbox -- <agent-id>   # when Vercel Sandbox is the assigned provider
 ```
 
-The proof must execute the real repository sandbox implementation, not a fake provider. It exercises at least:
+The repository proof exercises the real Vortex sandbox implementation, not a fake provider. It covers at least:
 
 - `AgentSandbox.executeJavaScript()`;
 - `AgentSandbox.executePythonSim()`;
 - `AgentSandbox.calculateEnergyBESS()` as a deterministic approved tool.
 
+The Vercel provider proof is separate: it must execute an actual harmless command through the Vercel Sandbox CLI and fail closed when the provider or authentication is unavailable. A local simulation cannot be promoted to `VERCEL_SANDBOX_READY`.
+
 ## 6. Connector ownership
 
-GitHub, GitHub MCP, project MCP, Google Cloud, X/network and other external connectors are **host-owned capabilities**. The local probe must never print, copy or infer credentials.
+GitHub, GitHub MCP, project MCP, Google Cloud, Vercel Sandbox, X/network and other external connectors are **host-owned capabilities**. The local probe must never print, copy or infer credentials.
 
-A connector is proven only by the host connector performing a harmless read and attaching execution/evidence metadata.
+A connector is proven only by the host connector performing a harmless read/execution and attaching execution/evidence metadata.
 
 ## 7. Multi-agent Git safety
 
@@ -102,8 +106,6 @@ Hard rules:
 - re-check the remote immediately before publication;
 - publish only through the repository's GOS3 gate.
 
-GitHub supports required pull requests and status checks, and strict checks can require a branch to be up to date before merge. These server-side controls complement, but do not replace, this runtime protocol.
-
 ## 8. Evidence envelope
 
 A successful onboarding receipt SHOULD contain:
@@ -111,7 +113,7 @@ A successful onboarding receipt SHOULD contain:
 ```json
 {
   "protocol": "GOS3",
-  "manifest_version": "1.0",
+  "manifest_version": "1.1",
   "agent_id": "<agent-id>",
   "runtime": "Vortex",
   "status": "TOOLING_READY",
@@ -126,10 +128,12 @@ A successful onboarding receipt SHOULD contain:
 }
 ```
 
+For Vercel Sandbox, the receipt MUST identify the provider as `vercel-sandbox` and contain execution/evidence IDs derived from the real command result.
+
 Do not put secrets, access tokens, cookies, PATs, API keys or credential material into the receipt.
 
 ## 9. New-agent rule
 
-This manifesto applies automatically to new agents. Adding a provider to the roster does not grant capability. The provider must pass the same behavioral onboarding gate.
+This manifesto applies automatically to new agents. Adding a provider to the roster does not grant capability. The provider must pass the same behavioral onboarding gate. A runtime assigned to an agent is part of its capability contract, not a claim inherited from another agent.
 
 **No proof → no capability → no consequential action.**
